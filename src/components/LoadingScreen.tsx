@@ -6,7 +6,7 @@ interface LoadingScreenProps {
 }
 
 export function LoadingScreen({ onComplete }: LoadingScreenProps) {
-  const [phase, setPhase] = useState<'loading' | 'melting' | 'complete'>('loading')
+  const [phase, setPhase] = useState<'intro' | 'loading' | 'melting' | 'complete'>('intro')
   const [progress, setProgress] = useState(0)
   const [barHeights, setBarHeights] = useState<number[]>([])
   const timeRef = useRef(0)
@@ -16,49 +16,97 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
   const LOGO_BAR_INDEX = 30
 
   useEffect(() => {
-    // Initialize bars
-    const initialHeights = Array.from({ length: NUM_BARS }, () => Math.random() * 0.5 + 0.3)
+    // Initialize bars at low height
+    const initialHeights = Array.from({ length: NUM_BARS }, () => 0.1 + Math.random() * 0.1)
     setBarHeights(initialHeights)
 
-    // Smooth animation loop
+    let introProgress = 0
+    let hasStartedLoading = false
+
+    // Smooth animation loop with natural intro
     const animate = () => {
       timeRef.current += 0.016
 
-      // Update bar heights with smooth waves
-      setBarHeights(prev => 
-        prev.map((_, i) => {
-          const baseFreq = Math.sin(timeRef.current * 3 + i * 0.15) * 0.25
-          const midFreq = Math.sin(timeRef.current * 5.5 + i * 0.08) * 0.18
-          const highFreq = Math.sin(timeRef.current * 8 + i * 0.22) * 0.12
-          const pulse = Math.sin(timeRef.current * 2 + i * 0.05) * 0.1
-          
-          return Math.max(0.2, Math.min(0.95, 0.4 + baseFreq + midFreq + highFreq + pulse))
-        })
-      )
+      // Intro phase - bars grow naturally
+      if (phase === 'intro' && introProgress < 1) {
+        introProgress += 0.012 // Slower intro
+        setBarHeights(prev => 
+          prev.map((_, i) => {
+            // Staggered growth from left to right
+            const staggerDelay = (i / NUM_BARS) * 0.5
+            const growth = Math.max(0, Math.min(1, introProgress - staggerDelay))
+            const eased = growth * growth * (3 - 2 * growth) // Smooth ease-in-out
+            
+            // Natural randomness
+            const target = 0.3 + Math.random() * 0.3
+            return 0.1 + (target * eased)
+          })
+        )
+        
+        if (introProgress >= 1 && !hasStartedLoading) {
+          hasStartedLoading = true
+          setPhase('loading')
+        }
+      }
+      
+      // Loading phase - natural audio-like movement
+      if (phase === 'loading') {
+        setBarHeights(prev => 
+          prev.map((currentHeight, i) => {
+            // Multiple frequencies like real audio spectrum
+            const position = i / NUM_BARS
+            
+            // Low frequencies (bass) - slower, larger waves on left
+            const bassWave = Math.sin(timeRef.current * 1.8 + position * 0.5) * 0.3 * (1 - position * 0.5)
+            
+            // Mid frequencies - medium waves in middle
+            const midWave = Math.sin(timeRef.current * 3.5 + position * 1.2) * 0.22 * (position < 0.7 ? 1 : 0.5)
+            
+            // High frequencies - faster, smaller waves on right
+            const highWave = Math.sin(timeRef.current * 6 + position * 2) * 0.15 * (position > 0.3 ? 1 : 0.3)
+            
+            // Random energy bursts (like beat hits)
+            const burstChance = Math.random()
+            const burst = burstChance > 0.98 ? Math.random() * 0.25 : 0
+            
+            // Natural target with inertia
+            const targetHeight = 0.35 + bassWave + midWave + highWave + burst
+            
+            // Smooth interpolation (inertia)
+            const newHeight = currentHeight + (targetHeight - currentHeight) * 0.15
+            
+            return Math.max(0.12, Math.min(0.95, newHeight))
+          })
+        )
+      }
 
       animationFrameRef.current = requestAnimationFrame(animate)
     }
 
     animationFrameRef.current = requestAnimationFrame(animate)
 
-    // Progress
-    let currentProgress = 0
-    const progressInterval = setInterval(() => {
-      currentProgress += currentProgress < 60 ? 4 : currentProgress < 90 ? 2 : 0.8
-      if (currentProgress >= 100) {
-        currentProgress = 100
-        clearInterval(progressInterval)
-      }
-      setProgress(currentProgress)
-    }, 100)
+    // Progress - starts after intro
+    const progressTimer = setTimeout(() => {
+      let currentProgress = 0
+      const progressInterval = setInterval(() => {
+        currentProgress += currentProgress < 60 ? 3.5 : currentProgress < 90 ? 1.8 : 0.7
+        if (currentProgress >= 100) {
+          currentProgress = 100
+          clearInterval(progressInterval)
+        }
+        setProgress(currentProgress)
+      }, 100)
+
+      return () => clearInterval(progressInterval)
+    }, 1200) // Wait for intro to mostly complete
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
-      clearInterval(progressInterval)
+      clearTimeout(progressTimer)
     }
-  }, [])
+  }, [phase])
 
   useEffect(() => {
     if (progress >= 100) {
@@ -104,7 +152,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       </div>
 
       {/* Floating ambient particles */}
-      {Array.from({ length: 40 }, (_, i) => (
+      {phase !== 'intro' && Array.from({ length: 35 }, (_, i) => (
         <div
           key={`ambient-${i}`}
           className="absolute rounded-full"
@@ -151,68 +199,71 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
           const isLogoBar = i === LOGO_BAR_INDEX
           const position = i / NUM_BARS
           
-          // Smooth color transition
+          // Natural frequency-based colors
           let hue, saturation, lightness
           if (position < 0.33) {
-            hue = 174 + (position * 3) * 15 // Cyan range
-            saturation = 80
-            lightness = 55
+            // Bass - cyan/teal
+            hue = 174 + (position * 3) * 12
+            saturation = 75 + height * 10
+            lightness = 52 + height * 8
           } else if (position < 0.66) {
-            hue = 189 + ((position - 0.33) * 3) * 15 // Sky range
-            saturation = 85
-            lightness = 58
+            // Mid - sky blue
+            hue = 186 + ((position - 0.33) * 3) * 18
+            saturation = 80 + height * 8
+            lightness = 55 + height * 8
           } else {
-            hue = 204 + ((position - 0.66) * 3) * 15 // Blue range
-            saturation = 82
-            lightness = 60
+            // High - blue
+            hue = 204 + ((position - 0.66) * 3) * 12
+            saturation = 78 + height * 10
+            lightness = 58 + height * 8
           }
 
           return (
             <div
               key={i}
-              className="relative flex-1 transition-all duration-75 ease-out"
+              className="relative flex-1 transition-all ease-out"
               style={{
-                height: phase === 'loading' ? `${height * 100}%` : '0%',
-                minHeight: phase === 'loading' ? '10%' : '0%',
+                height: phase === 'loading' || phase === 'intro' ? `${height * 100}%` : '0%',
+                minHeight: phase === 'loading' || phase === 'intro' ? '8%' : '0%',
                 background: isLogoBar
                   ? `linear-gradient(to top, 
-                      hsl(${hue}, ${saturation}%, ${lightness - 10}%) 0%,
-                      hsl(${hue}, ${saturation + 10}%, ${lightness}%) 50%,
-                      hsl(${hue}, ${saturation + 15}%, ${lightness + 15}%) 100%
+                      hsl(${hue}, ${saturation}%, ${lightness - 12}%) 0%,
+                      hsl(${hue}, ${saturation + 12}%, ${lightness + 2}%) 50%,
+                      hsl(${hue}, ${saturation + 18}%, ${lightness + 18}%) 100%
                     )`
                   : `linear-gradient(to top, 
-                      hsl(${hue}, ${saturation - 10}%, ${lightness - 15}%) 0%,
-                      hsl(${hue}, ${saturation}%, ${lightness - 5}%) 60%,
-                      hsl(${hue}, ${saturation + 5}%, ${lightness + 5}%) 100%
+                      hsl(${hue}, ${saturation - 8}%, ${lightness - 18}%) 0%,
+                      hsl(${hue}, ${saturation}%, ${lightness - 8}%) 60%,
+                      hsl(${hue}, ${saturation + 8}%, ${lightness + 8}%) 100%
                     )`,
                 borderRadius: '8px 8px 0 0',
                 boxShadow: isLogoBar
-                  ? `0 0 30px hsla(${hue}, ${saturation}%, ${lightness}%, 0.8),
-                     0 -20px 40px hsla(${hue}, ${saturation}%, ${lightness}%, 0.4),
-                     inset 0 -10px 20px rgba(255, 255, 255, 0.15)`
+                  ? `0 0 25px hsla(${hue}, ${saturation}%, ${lightness}%, ${0.6 + height * 0.3}),
+                     0 -15px 35px hsla(${hue}, ${saturation}%, ${lightness}%, ${0.3 + height * 0.2}),
+                     inset 0 -8px 16px rgba(255, 255, 255, ${0.1 + height * 0.08})`
                   : height > 0.7
-                    ? `0 0 15px hsla(${hue}, ${saturation}%, ${lightness}%, 0.5),
-                       inset 0 -5px 10px rgba(255, 255, 255, 0.1)`
-                    : `0 0 8px hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`,
+                    ? `0 0 12px hsla(${hue}, ${saturation}%, ${lightness}%, ${height * 0.5}),
+                       inset 0 -4px 8px rgba(255, 255, 255, ${height * 0.08})`
+                    : `0 0 6px hsla(${hue}, ${saturation}%, ${lightness}%, ${height * 0.3})`,
                 transform: phase === 'melting'
                   ? `scaleY(0) translateY(100%)`
-                  : height > 0.75 ? 'scaleY(1.02)' : 'scaleY(1)',
+                  : height > 0.75 ? `scaleY(${1 + (height - 0.75) * 0.08})` : 'scaleY(1)',
                 transformOrigin: 'bottom',
-                opacity: phase === 'melting' ? 0 : (height > 0.4 ? 1 : 0.8),
-                filter: height > 0.8 ? `brightness(1.2) saturate(1.1)` : 'brightness(1)',
-                transition: phase === 'melting'
-                  ? `all ${0.8 + Math.random() * 0.5}s cubic-bezier(0.6, 0, 0.8, 1) ${i * 0.012}s`
-                  : 'all 0.075s cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: phase === 'melting' ? 0 : (height > 0.35 ? 1 : 0.75 + height * 0.4),
+                filter: height > 0.8 ? `brightness(${1.15 + (height - 0.8) * 0.3}) saturate(1.1)` : 'brightness(1)',
+                transitionDuration: phase === 'melting' ? `${0.8 + Math.random() * 0.5}s` : '0.1s',
+                transitionTimingFunction: phase === 'melting' ? 'cubic-bezier(0.6, 0, 0.8, 1)' : 'ease-out',
+                transitionDelay: phase === 'melting' ? `${i * 0.012}s` : '0s',
               }}
             >
               {/* Glossy top highlight */}
-              {height > 0.5 && phase === 'loading' && (
+              {height > 0.45 && (phase === 'loading' || phase === 'intro') && (
                 <div
                   className="absolute top-0 left-0 right-0 h-12 rounded-t-lg pointer-events-none"
                   style={{
                     background: `linear-gradient(to bottom, 
-                      rgba(255, 255, 255, ${height * 0.35}) 0%,
-                      rgba(255, 255, 255, ${height * 0.15}) 50%,
+                      rgba(255, 255, 255, ${height * 0.32}) 0%,
+                      rgba(255, 255, 255, ${height * 0.12}) 50%,
                       transparent 100%
                     )`,
                   }}
@@ -220,16 +271,17 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
               )}
 
               {/* Logo */}
-              {isLogoBar && phase === 'loading' && (
+              {isLogoBar && (phase === 'loading' || phase === 'intro') && (
                 <div
                   className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
                   style={{
                     bottom: '100%',
                     marginBottom: '25px',
-                    transform: `translate(-50%, 0) scale(${0.9 + logoHeight * 0.3}) rotate(${Math.sin(timeRef.current * 2) * 3}deg)`,
+                    transform: `translate(-50%, 0) scale(${0.88 + logoHeight * 0.35}) rotate(${Math.sin(timeRef.current * 1.8) * 2.5}deg)`,
+                    opacity: phase === 'intro' ? Math.min(1, progress / 20) : 1,
                   }}
                 >
-                  <Logo isAnimating={true} size={100} />
+                  <Logo isAnimating={phase === 'loading'} size={100} />
                 </div>
               )}
             </div>
@@ -240,7 +292,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       {/* Title with enhanced styling */}
       <div 
         className={`mt-20 transition-all duration-1000 ${
-          progress > 10 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          progress > 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
         } ${phase === 'melting' ? 'opacity-0 -translate-y-16 scale-110' : ''}`}
       >
         <h1
@@ -258,7 +310,7 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
         </h1>
         <p 
           className={`text-sm text-gray-400 text-center tracking-[0.3em] uppercase transition-all duration-700 ${
-            progress > 25 ? 'opacity-100' : 'opacity-0'
+            progress > 20 ? 'opacity-100' : 'opacity-0'
           }`}
           style={{
             textShadow: '0 0 20px rgba(20, 184, 166, 0.3)',
@@ -271,12 +323,10 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
       {/* Sleek progress bar */}
       <div
         className={`mt-12 w-[500px] max-w-[90vw] transition-all duration-700 ${
-          progress > 20 ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          progress > 15 ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
         } ${phase === 'melting' ? 'opacity-0 scale-90' : ''}`}
       >
-        {/* Progress container */}
         <div className="relative h-2 bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-full overflow-hidden backdrop-blur-sm">
-          {/* Progress fill */}
           <div
             className="absolute inset-y-0 left-0 rounded-full"
             style={{
@@ -286,7 +336,6 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
               transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            {/* Shimmer overlay */}
             <div
               className="absolute inset-0 rounded-full opacity-60"
               style={{
@@ -297,7 +346,6 @@ export function LoadingScreen({ onComplete }: LoadingScreenProps) {
           </div>
         </div>
 
-        {/* Percentage */}
         <div
           className="mt-5 text-center text-lg font-bold font-mono"
           style={{
