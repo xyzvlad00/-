@@ -11,6 +11,7 @@ import { PrivacyNotice } from './components/PrivacyNotice'
 import { InstallPrompt } from './components/InstallPrompt'
 import { PerformanceStats } from './components/PerformanceStats'
 import { MobileBottomSheet } from './components/MobileBottomSheet'
+import { LoadingScreen } from './components/LoadingScreen'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useTouchGestures } from './hooks/useTouchGestures'
 import { useAutoCycle } from './hooks/useAutoCycle'
@@ -23,6 +24,7 @@ function App() {
   const [showPerformance, setShowPerformance] = useState(false)
   const [showMobileControls, setShowMobileControls] = useState(false)
   const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null)
+  const [loadingComplete, setLoadingComplete] = useState(false)
 
   // Memoize mobile detection to prevent re-renders
   const mobile = useMemo(() => isMobile(), [])
@@ -32,6 +34,9 @@ function App() {
   useAutoCycle(autoCycle, 30)
 
   useEffect(() => {
+    // Only initialize after loading is complete
+    if (!loadingComplete) return
+
     audioEngine.start()
     performanceMonitor.start()
     
@@ -74,71 +79,84 @@ function App() {
         }
       }
     }
-  }, [mobile, wakeLock])
+  }, [mobile, wakeLock, loadingComplete])
 
   return (
-    <div
-      className={clsx(
-        'min-h-screen bg-gradient-to-b from-night-900 via-night-900 to-black text-white transition-colors',
-        theme === 'light' && 'from-white via-slate-100 to-slate-200 text-slate-900',
-        mobile && 'pb-safe' // iOS safe area
+    <>
+      {/* Loading screen with animated logo */}
+      {!loadingComplete && (
+        <LoadingScreen onComplete={() => setLoadingComplete(true)} />
       )}
-    >
-      <div className={clsx(
-        'mx-auto flex min-h-screen max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:gap-6 lg:px-6 lg:py-6',
-        mobile && 'px-2 py-2 gap-2'
-      )}>
-        <div className="flex flex-1 flex-col gap-4">
-          <HeaderBar />
-          <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
-            <div className="relative flex-1">
-              <VisualHost />
+
+      {/* Main application - starts invisible, fades in after loading */}
+      <div
+        className={clsx(
+          'min-h-screen text-white',
+          theme === 'light' && 'text-slate-900',
+          mobile && 'pb-safe' // iOS safe area
+        )}
+        style={{
+          background: theme === 'dark' 
+            ? 'radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a14 60%, #000000 100%)'
+            : 'linear-gradient(to bottom, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%)',
+          opacity: loadingComplete ? 1 : 0,
+          transition: loadingComplete ? 'opacity 2s ease-in 0.3s' : 'none',
+        }}
+      >
+        <div className={clsx(
+          'mx-auto flex min-h-screen max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:gap-6 lg:px-6 lg:py-6',
+          mobile && 'px-2 py-2 gap-2'
+        )}>
+          <div className="flex flex-1 flex-col gap-4">
+            <HeaderBar />
+            <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:gap-6">
+              <div className="relative flex-1">
+                <VisualHost />
+                
+                {/* Mobile floating controls button */}
+                {mobile && (
+                  <button
+                    onClick={() => setShowMobileControls(true)}
+                    className="fixed bottom-6 right-6 z-30 p-4 bg-aurora-500 hover:bg-aurora-600 text-white rounded-full shadow-2xl transition-all active:scale-95"
+                    aria-label="Open controls"
+                  >
+                    <Settings2 className="w-6 h-6" />
+                  </button>
+                )}
+              </div>
               
-              {/* Mobile floating controls button */}
-              {mobile && (
-                <button
-                  onClick={() => setShowMobileControls(true)}
-                  className="fixed bottom-6 right-6 z-30 p-4 bg-aurora-500 hover:bg-aurora-600 text-white rounded-full shadow-2xl transition-all active:scale-95"
-                  aria-label="Open controls"
-                >
-                  <Settings2 className="w-6 h-6" />
-                </button>
+              {/* Desktop controls (hidden on mobile) */}
+              {!mobile && (
+                <div className="lg:hidden">
+                  <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
+                </div>
               )}
             </div>
-            
-            {/* Desktop controls (hidden on mobile) */}
+            <PermissionOverlay />
             {!mobile && (
-              <div className="lg:hidden">
-                <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
-              </div>
+              <PrivacyNotice />
             )}
           </div>
-          <PermissionOverlay />
-          {!mobile && (
-            <div>
-              <PrivacyNotice />
-            </div>
-          )}
+          <div className="hidden lg:block lg:w-80 xl:w-96">
+            <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
+          </div>
         </div>
-        <div className="hidden lg:block lg:w-80 xl:w-96">
-          <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
-        </div>
+        
+        {/* Mobile Bottom Sheet Controls */}
+        {mobile && (
+          <MobileBottomSheet
+            isOpen={showMobileControls}
+            onClose={() => setShowMobileControls(false)}
+            title="Controls"
+          >
+            <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
+          </MobileBottomSheet>
+        )}
+        
+        <InstallPrompt />
+        <PerformanceStats show={showPerformance} />
       </div>
-      
-      {/* Mobile Bottom Sheet Controls */}
-      {mobile && (
-        <MobileBottomSheet
-          isOpen={showMobileControls}
-          onClose={() => setShowMobileControls(false)}
-          title="Controls"
-        >
-          <ControlsPanel autoCycle={autoCycle} setAutoCycle={setAutoCycle} />
-        </MobileBottomSheet>
-      )}
-      
-      <InstallPrompt />
-      <PerformanceStats show={showPerformance} />
-    </div>
+    </>
   )
 }
 

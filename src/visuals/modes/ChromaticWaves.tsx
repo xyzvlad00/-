@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useCanvasLoop } from '../useCanvasLoop'
 import type { VisualComponentProps } from '../types'
 
-export function ChromaticWaves({ sensitivity }: VisualComponentProps) {
+function ChromaticWaves({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useCanvasLoop(
@@ -99,3 +99,5 @@ export function ChromaticWaves({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
 }
+
+export default ChromaticWaves

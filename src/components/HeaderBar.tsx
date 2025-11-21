@@ -24,16 +24,16 @@ export function HeaderBar() {
 
   return (
     <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <p className={clsx('text-sm uppercase tracking-[0.4em]', theme === 'dark' ? 'text-white/40' : 'text-slate-500')}>
+      <div className="transition-all duration-300 hover:translate-x-1">
+        <p className={clsx('text-sm uppercase tracking-[0.4em] transition-all duration-300', theme === 'dark' ? 'text-white/40 hover:text-white/60' : 'text-slate-500 hover:text-slate-700')}>
           Live VFX
         </p>
-        <h1 className={clsx('text-3xl font-semibold md:text-4xl', theme === 'dark' ? 'text-white' : 'text-slate-900')}>Live VFX Spectrum</h1>
-        <p className={clsx('text-sm', theme === 'dark' ? 'text-white/60' : 'text-slate-600')}>Mic-reactive visuals rendered fully in your browser.</p>
+        <h1 className={clsx('text-3xl font-semibold md:text-4xl transition-colors duration-300', theme === 'dark' ? 'text-white hover:text-teal-300' : 'text-slate-900 hover:text-sky-600')}>Live VFX Spectrum</h1>
+        <p className={clsx('text-sm transition-colors duration-300', theme === 'dark' ? 'text-white/60 hover:text-white/80' : 'text-slate-600 hover:text-slate-800')}>Mic-reactive visuals rendered fully in your browser.</p>
       </div>
       <div className="flex flex-wrap gap-3">
-        <div className={clsx('flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm', statusTone)}>
-          <span className="h-2 w-2 rounded-full bg-current" />
+        <div className={clsx('flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm transition-all duration-300 hover:scale-105 hover:shadow-lg', statusTone)}>
+          <span className={clsx('h-2 w-2 rounded-full bg-current transition-transform duration-300 hover:scale-150', audioStatus === 'listening' && 'animate-pulse-slow')} />
           <span>{statusInfo.label}</span>
         </div>
         {audioMessage && (
@@ -51,7 +51,7 @@ export function HeaderBar() {
             type="button"
             onClick={() => audioEngine.resume()}
             className={clsx(
-              'rounded-2xl border border-aurora-500/40 bg-aurora-500/20 px-4 py-2 text-sm shadow-glow',
+              'rounded-2xl border border-aurora-500/40 bg-aurora-500/20 px-4 py-2 text-sm shadow-glow transition-all duration-300 hover:scale-110 hover:shadow-xl hover:bg-aurora-500/30',
               theme === 'dark' ? 'text-white' : 'text-slate-900',
             )}
           >
@@ -63,10 +63,10 @@ export function HeaderBar() {
             type="button"
             onClick={() => audioEngine.start()}
             className={clsx(
-              'rounded-2xl border px-4 py-2 text-sm',
+              'rounded-2xl border px-4 py-2 text-sm transition-all duration-300 hover:scale-110 hover:shadow-lg',
               theme === 'dark'
-                ? 'border-white/20 text-white/80 hover:border-white/40'
-                : 'border-slate-200 text-slate-700 hover:border-aurora-500/30',
+                ? 'border-white/20 text-white/80 hover:border-white/40 hover:bg-white/5'
+                : 'border-slate-200 text-slate-700 hover:border-aurora-500/30 hover:bg-slate-50',
             )}
           >
             Retry

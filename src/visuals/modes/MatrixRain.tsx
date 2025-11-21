@@ -15,7 +15,7 @@ interface MatrixColumn {
   chars: string[]
 }
 
-export function MatrixRain({ sensitivity }: VisualComponentProps) {
+function MatrixRain({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const columnsRef = useRef<MatrixColumn[]>([])
   const timeRef = useRef(0)
@@ -143,3 +143,4 @@ function getRandomChar(): string {
   return matrixChars[Math.floor(Math.random() * matrixChars.length)]
 }
 
+export default MatrixRain

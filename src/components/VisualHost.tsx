@@ -58,8 +58,8 @@ export function VisualHost() {
         className={clsx(
           'relative flex-1 overflow-hidden rounded-[32px] border',
           'min-h-[420px] w-full',
-          'shadow-[0_20px_60px_rgba(0,0,0,0.35)]',
-          isDark ? 'border-white/5 bg-night-900/70' : 'border-black/10 bg-white',
+          'shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition-all duration-500 hover:shadow-[0_30px_80px_rgba(0,0,0,0.45)]',
+          isDark ? 'border-white/5 bg-night-900/70 hover:border-teal-500/20' : 'border-black/10 bg-white hover:border-sky-400/30',
         )}
       >
         <ErrorBoundary>
@@ -69,7 +69,7 @@ export function VisualHost() {
         </ErrorBoundary>
         <div
           className={clsx(
-            'pointer-events-none absolute left-6 top-6 rounded-full border px-4 py-1 text-xs uppercase tracking-[0.2em] backdrop-blur transition-opacity duration-500',
+            'pointer-events-none absolute left-6 top-6 rounded-full border px-4 py-1 text-xs uppercase tracking-[0.2em] backdrop-blur transition-all duration-500',
             isDark ? 'border-white/10 bg-black/40 text-white/70' : 'border-slate-200 bg-white/90 text-slate-700',
             isFullscreen && !showUI && 'opacity-0',
           )}
@@ -81,10 +81,10 @@ export function VisualHost() {
           onClick={toggleFullscreen}
           aria-label={isFullscreen ? 'Exit fullscreen mode' : 'Enter fullscreen mode'}
           className={clsx(
-            'absolute right-6 top-6 rounded-full border px-4 py-1 text-xs uppercase tracking-[0.2em] backdrop-blur transition-all duration-500',
+            'absolute right-6 top-6 rounded-full border px-4 py-1 text-xs uppercase tracking-[0.2em] backdrop-blur transition-all duration-300 hover:scale-110 hover:shadow-lg',
             isDark
-              ? 'border-white/10 bg-black/40 text-white/70 hover:bg-black/60'
-              : 'border-slate-200 bg-white/90 text-slate-700 hover:bg-white',
+              ? 'border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:border-white/20'
+              : 'border-slate-200 bg-white/90 text-slate-700 hover:bg-white hover:border-slate-300',
             isFullscreen && !showUI && 'opacity-0 pointer-events-none',
           )}
         >

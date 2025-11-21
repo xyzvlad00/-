@@ -5,7 +5,7 @@ import { hsl, hslToRgb, createRadialGradient } from '../utils/colors'
 import { easeAudio } from '../utils/audio'
 import { EASING_CURVES, PERFORMANCE } from '../constants'
 
-export function FluidDynamics({ sensitivity }: VisualComponentProps) {
+function FluidDynamics({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const metaballsRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; radius: number; hue: number; energy: number }>>([])
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -20,20 +20,20 @@ export function FluidDynamics({ sensitivity }: VisualComponentProps) {
       const centerY = height / 2
 
       const pixelCount = width * height
-      let renderScale = 0.6
-      let maxBalls = 35
+      let renderScale = 0.5
+      let maxBalls = 28
       
       if (pixelCount > PERFORMANCE.FULLSCREEN_1080P) {
-        renderScale = 0.45
-        maxBalls = 20
-      }
-      if (pixelCount > PERFORMANCE.FULLSCREEN_1440P) {
         renderScale = 0.35
         maxBalls = 16
       }
-      if (pixelCount > PERFORMANCE.FULLSCREEN_4K) {
+      if (pixelCount > PERFORMANCE.FULLSCREEN_1440P) {
         renderScale = 0.28
         maxBalls = 12
+      }
+      if (pixelCount > PERFORMANCE.FULLSCREEN_4K) {
+        renderScale = 0.22
+        maxBalls = 8
       }
       
       const renderWidth = Math.floor(width * renderScale)
@@ -207,3 +207,5 @@ export function FluidDynamics({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
 }
+
+export default FluidDynamics

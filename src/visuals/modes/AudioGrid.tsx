@@ -4,7 +4,7 @@ import type { VisualComponentProps } from '../types'
 
 const GRID_SIZE = 16
 
-export function AudioGrid({ sensitivity }: VisualComponentProps) {
+function AudioGrid({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useCanvasLoop(
@@ -41,3 +41,4 @@ export function AudioGrid({ sensitivity }: VisualComponentProps) {
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/20" />
 }
 
+export default AudioGrid

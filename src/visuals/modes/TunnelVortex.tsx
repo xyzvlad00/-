@@ -23,7 +23,7 @@ interface StreamParticle {
 const RING_COUNT = 100
 const MAX_PARTICLES = 150
 
-export function TunnelVortex({ sensitivity }: VisualComponentProps) {
+function TunnelVortex({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const ringsRef = useRef<TunnelRing[]>([])
   const particlesRef = useRef<StreamParticle[]>([])
@@ -233,3 +233,5 @@ export function TunnelVortex({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
 }
+
+export default TunnelVortex

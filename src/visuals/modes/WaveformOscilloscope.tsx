@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useCanvasLoop } from '../useCanvasLoop'
 import type { VisualComponentProps } from '../types'
 
-export function WaveformOscilloscope({ sensitivity, theme }: VisualComponentProps) {
+function WaveformOscilloscope({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glow = useMemo(
     () => (theme === 'dark' ? 'rgba(64,243,255,0.4)' : 'rgba(0,40,80,0.3)'),
@@ -59,3 +59,4 @@ export function WaveformOscilloscope({ sensitivity, theme }: VisualComponentProp
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/10" />
 }
 
+export default WaveformOscilloscope

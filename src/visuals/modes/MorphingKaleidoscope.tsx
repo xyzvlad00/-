@@ -756,7 +756,7 @@ const SHAPES: ShapeDefinition[] = [
         const maxRadius = radius * 0.85
         const spiralTurns = 3 + easedSample * 2
         
-        ctx.beginPath()
+  ctx.beginPath()
         for (let p = 0; p <= points; p++) {
           const t = p / points
           const angle = t * Math.PI * 2 * spiralTurns + seed + s * (Math.PI * 2 / spirals)
@@ -793,7 +793,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled
 }
 
-export function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
+function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const shuffledOrderRef = useRef<number[]>([])
   const currentIndexRef = useRef(0)
@@ -897,7 +897,7 @@ export function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
         glowGradient.addColorStop(1, 'rgba(0,0,0,0)')
 
         ctx.fillStyle = glowGradient
-        ctx.beginPath()
+          ctx.beginPath()
         ctx.arc(width / 2, height / 2, glowSize, 0, Math.PI * 2)
         ctx.fill()
       }
@@ -907,3 +907,5 @@ export function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
 }
+
+export default MorphingKaleidoscope

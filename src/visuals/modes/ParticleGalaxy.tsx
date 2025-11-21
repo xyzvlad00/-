@@ -20,10 +20,10 @@ interface Star {
   trail: Array<{ x: number; y: number; alpha: number }>
 }
 
-const STAR_COUNT = 2500 // MASSIVE increase
-const TRAIL_LENGTH = 25
+const STAR_COUNT = 800 // Optimized for performance
+const TRAIL_LENGTH = 10 // Reduced trail length
 
-export function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
+function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const starsRef = useRef<Star[]>([])
   const timeRef = useRef(0)
@@ -300,3 +300,5 @@ export function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/10" />
 }
+
+export default ParticleGalaxy

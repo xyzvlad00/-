@@ -16,7 +16,7 @@ interface Building {
   style: 'modern' | 'classic' | 'tower'
 }
 
-export function SpectrumCity({ sensitivity }: VisualComponentProps) {
+function SpectrumCity({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const buildingsRef = useRef<Building[]>([])
   const cloudsRef = useRef<Array<{ x: number; y: number; speed: number; size: number; alpha: number }>>([])
@@ -244,3 +244,5 @@ export function SpectrumCity({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />
 }
+
+export default SpectrumCity

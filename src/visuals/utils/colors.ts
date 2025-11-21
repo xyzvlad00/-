@@ -82,9 +82,16 @@ export function createRadialGradient(
   outerRadius: number,
   stops: Array<{ offset: number; color: string }>,
 ): CanvasGradient {
-  const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, outerRadius)
+  // Validate inputs to prevent non-finite errors
+  const safeX = isFinite(x) ? x : 0
+  const safeY = isFinite(y) ? y : 0
+  const safeInner = isFinite(innerRadius) && innerRadius >= 0 ? innerRadius : 0
+  const safeOuter = isFinite(outerRadius) && outerRadius >= 0 ? outerRadius : 1
+  
+  const gradient = ctx.createRadialGradient(safeX, safeY, safeInner, safeX, safeY, safeOuter)
   stops.forEach(({ offset, color }) => {
-    gradient.addColorStop(offset, color)
+    const safeOffset = isFinite(offset) ? Math.max(0, Math.min(1, offset)) : 0
+    gradient.addColorStop(safeOffset, color)
   })
   return gradient
 }
@@ -100,9 +107,16 @@ export function createLinearGradient(
   y1: number,
   stops: Array<{ offset: number; color: string }>,
 ): CanvasGradient {
-  const gradient = ctx.createLinearGradient(x0, y0, x1, y1)
+  // Validate inputs to prevent non-finite errors
+  const safeX0 = isFinite(x0) ? x0 : 0
+  const safeY0 = isFinite(y0) ? y0 : 0
+  const safeX1 = isFinite(x1) ? x1 : 1
+  const safeY1 = isFinite(y1) ? y1 : 1
+  
+  const gradient = ctx.createLinearGradient(safeX0, safeY0, safeX1, safeY1)
   stops.forEach(({ offset, color }) => {
-    gradient.addColorStop(offset, color)
+    const safeOffset = isFinite(offset) ? Math.max(0, Math.min(1, offset)) : 0
+    gradient.addColorStop(safeOffset, color)
   })
   return gradient
 }

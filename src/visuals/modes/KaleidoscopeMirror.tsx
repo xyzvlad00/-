@@ -206,7 +206,7 @@ const SHAPES: ShapeDefinition[] = [
   }
 ]
 
-export function KaleidoscopeMirror({ sensitivity }: VisualComponentProps) {
+function KaleidoscopeMirror({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const shapeIndexRef = useRef(0)
   const shapeTimerRef = useRef(0)
@@ -254,3 +254,5 @@ export function KaleidoscopeMirror({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/20" />
 }
+
+export default KaleidoscopeMirror

@@ -6,8 +6,8 @@ import { easeAudio, getFrequencyValue } from '../utils/audio'
 import { applyGlow, clearGlow } from '../utils/shapes'
 import { EASING_CURVES } from '../constants'
 
-const BANDS = 18
-const SEGMENTS_PER_RING = 120
+const BANDS = 16
+const SEGMENTS_PER_RING = 80 // Reduced for better performance
 
 interface Particle {
   angle: number
@@ -18,7 +18,7 @@ interface Particle {
   size: number
 }
 
-export function FrequencyRings({ sensitivity }: VisualComponentProps) {
+function FrequencyRings({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<Particle[]>([])
   const waveRef = useRef<Array<{ radius: number; alpha: number; width: number }>>([])
@@ -272,3 +272,5 @@ export function FrequencyRings({ sensitivity }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
 }
+
+export default FrequencyRings

@@ -2,26 +2,25 @@ import { lazy } from 'react'
 import type { VisualDefinition } from './types'
 
 // Lazy load all visual components for better initial load performance
-// Each visual mode is now loaded only when selected
-const BarsSpectrum = lazy(() => import('./modes/BarsSpectrum').then((m) => ({ default: m.BarsSpectrum })))
-const WaveformOscilloscope = lazy(() => import('./modes/WaveformOscilloscope').then((m) => ({ default: m.WaveformOscilloscope })))
-const RadialSpectrum = lazy(() => import('./modes/RadialSpectrum').then((m) => ({ default: m.RadialSpectrum })))
-const OrbitalParticles = lazy(() => import('./modes/OrbitalParticles').then((m) => ({ default: m.OrbitalParticles })))
-const FrequencyRings = lazy(() => import('./modes/FrequencyRings').then((m) => ({ default: m.FrequencyRings })))
-const AudioGrid = lazy(() => import('./modes/AudioGrid').then((m) => ({ default: m.AudioGrid })))
-const KaleidoscopeMirror = lazy(() => import('./modes/KaleidoscopeMirror').then((m) => ({ default: m.KaleidoscopeMirror })))
-const LiquidSurface = lazy(() => import('./modes/LiquidSurface').then((m) => ({ default: m.LiquidSurface })))
-const Constellation = lazy(() => import('./modes/Constellation').then((m) => ({ default: m.Constellation })))
-const SpectrumCity = lazy(() => import('./modes/SpectrumCity').then((m) => ({ default: m.SpectrumCity })))
-const MorphingKaleidoscope = lazy(() => import('./modes/MorphingKaleidoscope').then((m) => ({ default: m.MorphingKaleidoscope })))
-const FluidDynamics = lazy(() => import('./modes/FluidDynamics').then((m) => ({ default: m.FluidDynamics })))
-const TunnelVortex = lazy(() => import('./modes/TunnelVortex').then((m) => ({ default: m.TunnelVortex })))
-const ParticleGalaxy = lazy(() => import('./modes/ParticleGalaxy').then((m) => ({ default: m.ParticleGalaxy })))
-const ChromaticWaves = lazy(() => import('./modes/ChromaticWaves').then((m) => ({ default: m.ChromaticWaves })))
-const NeuralNetwork = lazy(() => import('./modes/NeuralNetwork').then((m) => ({ default: m.NeuralNetwork })))
-const DNAHelix = lazy(() => import('./modes/DNAHelix').then((m) => ({ default: m.DNAHelix })))
-const MatrixRain = lazy(() => import('./modes/MatrixRain').then((m) => ({ default: m.MatrixRain })))
-const ParticleExplosion = lazy(() => import('./modes/ParticleExplosion').then((m) => ({ default: m.ParticleExplosion })))
+// Each visual mode is now loaded only when selected (all use default exports)
+const BarsSpectrum = lazy(() => import('./modes/BarsSpectrum'))
+const WaveformOscilloscope = lazy(() => import('./modes/WaveformOscilloscope'))
+const RadialSpectrum = lazy(() => import('./modes/RadialSpectrum'))
+const OrbitalParticles = lazy(() => import('./modes/OrbitalParticles'))
+const FrequencyRings = lazy(() => import('./modes/FrequencyRings'))
+const AudioGrid = lazy(() => import('./modes/AudioGrid'))
+const KaleidoscopeMirror = lazy(() => import('./modes/KaleidoscopeMirror'))
+const LiquidSurface = lazy(() => import('./modes/LiquidSurface'))
+const Constellation = lazy(() => import('./modes/Constellation'))
+const SpectrumCity = lazy(() => import('./modes/SpectrumCity'))
+const MorphingKaleidoscope = lazy(() => import('./modes/MorphingKaleidoscope'))
+const FluidDynamics = lazy(() => import('./modes/FluidDynamics'))
+const TunnelVortex = lazy(() => import('./modes/TunnelVortex'))
+const ParticleGalaxy = lazy(() => import('./modes/ParticleGalaxy'))
+const ChromaticWaves = lazy(() => import('./modes/ChromaticWaves'))
+const NeuralNetwork = lazy(() => import('./modes/NeuralNetwork'))
+const DNAHelix = lazy(() => import('./modes/DNAHelix'))
+const MatrixRain = lazy(() => import('./modes/MatrixRain'))
 
 export const visualRegistry: VisualDefinition[] = [
   { id: 'morph-kaleid', name: 'Morphing Kaleidoscope', description: 'Geometry that transforms and rotates', Component: MorphingKaleidoscope },
@@ -42,7 +41,6 @@ export const visualRegistry: VisualDefinition[] = [
   { id: 'city', name: 'Spectrum City', description: 'City skyline heights from frequency bands', Component: SpectrumCity },
   { id: 'dna', name: 'DNA Helix', description: 'Double helix structure with base pair connections', Component: DNAHelix },
   { id: 'matrix', name: 'Matrix Rain', description: 'Falling matrix code with beat detection', Component: MatrixRain },
-  { id: 'explosion', name: 'Particle Explosion', description: '3D particle explosions on every beat', Component: ParticleExplosion },
 ]
 
 export const getVisualById = (id: VisualDefinition['id']) => visualRegistry.find((visual) => visual.id === id) ?? visualRegistry[0]

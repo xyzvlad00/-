@@ -24,7 +24,7 @@ interface Droplet {
   hue: number
 }
 
-export function LiquidSurface({ sensitivity }: VisualComponentProps) {
+function LiquidSurface({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const layersRef = useRef<AuroraLayer[]>([])
   const dropletsRef = useRef<Droplet[]>([])
@@ -206,3 +206,4 @@ export function LiquidSurface({ sensitivity }: VisualComponentProps) {
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />
 }
 
+export default LiquidSurface

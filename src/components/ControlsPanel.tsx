@@ -22,14 +22,14 @@ export function ControlsPanel({ autoCycle, setAutoCycle }: ControlsPanelProps) {
   return (
     <aside
       className={clsx(
-        'w-full max-w-sm rounded-3xl p-6 text-sm backdrop-blur-md lg:max-w-xs',
-        isDark ? 'border border-white/5 bg-black/40 text-white/90' : 'border border-black/10 bg-white text-slate-700 shadow-xl',
+        'w-full max-w-sm rounded-3xl p-6 text-sm backdrop-blur-md lg:max-w-xs transition-all duration-500 hover:shadow-2xl',
+        isDark ? 'border border-white/5 bg-black/40 text-white/90 hover:border-white/10 hover:bg-black/50' : 'border border-black/10 bg-white text-slate-700 shadow-xl hover:shadow-3xl',
       )}
     >
       <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className={clsx('text-lg font-semibold', isDark ? 'text-white' : 'text-slate-900')}>Visual Modes</h2>
-          <span className={clsx('text-xs uppercase tracking-[0.2em]', isDark ? 'text-white/50' : 'text-slate-500')}>Live</span>
+        <div className="mb-3 flex items-center justify-between transition-all duration-300 hover:translate-x-1">
+          <h2 className={clsx('text-lg font-semibold transition-colors duration-300', isDark ? 'text-white hover:text-teal-300' : 'text-slate-900 hover:text-sky-600')}>Visual Modes</h2>
+          <span className={clsx('text-xs uppercase tracking-[0.2em] transition-colors duration-300', isDark ? 'text-white/50 hover:text-white/70' : 'text-slate-500 hover:text-slate-700')}>Live</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {visualRegistry.map((visual) => {
@@ -42,14 +42,14 @@ export function ControlsPanel({ autoCycle, setAutoCycle }: ControlsPanelProps) {
                 aria-label={`Switch to ${visual.name} visual mode`}
                 aria-pressed={isActive}
                 className={clsx(
-                  'rounded-2xl border px-3 py-3 text-left transition',
+                  'rounded-2xl border px-3 py-3 text-left transition-all duration-300 hover:scale-110 hover:shadow-xl hover:-translate-y-1',
                   isDark
                     ? isActive
                       ? 'border-aurora-500/70 bg-aurora-500/10 text-white shadow-glow'
-                      : 'border-white/10 bg-white/5 text-white/80 hover:border-white/30'
+                      : 'border-white/10 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10'
                     : isActive
                       ? 'border-aurora-500/40 bg-aurora-500/10 text-slate-900 shadow-glow'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-aurora-500/30',
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-aurora-500/30 hover:bg-slate-100',
                 )}
               >
                 <p className="text-sm font-semibold">{visual.name}</p>
@@ -60,10 +60,10 @@ export function ControlsPanel({ autoCycle, setAutoCycle }: ControlsPanelProps) {
         </div>
       </section>
       <section className="mb-8 space-y-4">
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className={clsx('font-semibold', isDark ? 'text-white' : 'text-slate-900')}>Sensitivity</h3>
-            <span className={clsx('text-xs', isDark ? 'text-white/60' : 'text-slate-500')}>{sensitivity.toFixed(1)}x</span>
+        <div className="group">
+          <div className="mb-2 flex items-center justify-between transition-all duration-300 group-hover:translate-x-1">
+            <h3 className={clsx('font-semibold transition-colors duration-300', isDark ? 'text-white group-hover:text-teal-300' : 'text-slate-900 group-hover:text-sky-600')}>Sensitivity</h3>
+            <span className={clsx('text-xs transition-colors duration-300', isDark ? 'text-white/60 group-hover:text-white/80' : 'text-slate-500 group-hover:text-slate-700')}>{sensitivity.toFixed(1)}x</span>
           </div>
           <input
             type="range"

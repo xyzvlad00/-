@@ -8,7 +8,7 @@ import { EASING_CURVES } from '../constants'
 
 const BAR_COUNT = 128
 
-export function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
+function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const peakHoldRef = useRef<number[]>(new Array(BAR_COUNT).fill(0))
   const peakFallRef = useRef<number[]>(new Array(BAR_COUNT).fill(0))
@@ -115,3 +115,5 @@ export function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/10" />
 }
+
+export default BarsSpectrum

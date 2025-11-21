@@ -1,6 +1,6 @@
 # 🎨 Live Audio Visualizer
 
-A modern, real-time audio-reactive visual effects web application featuring 17 unique visualization modes powered by Web Audio API and advanced canvas rendering.
+A modern, real-time audio-reactive visual effects web application featuring 18 unique visualization modes powered by Web Audio API and advanced canvas rendering.
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![React](https://img.shields.io/badge/React-19.2-61dafb)
@@ -21,7 +21,7 @@ A modern, real-time audio-reactive visual effects web application featuring 17 u
 - **Privacy-first** - All processing happens locally in your browser
 - **No recording** - Audio is analyzed in real-time, never stored
 
-### 🎨 Visual Effects (17 Modes)
+### 🎨 Visual Effects (18 Modes)
 
 #### 🌟 Advanced Effects
 1. **Morphing Kaleidoscope** ⭐ *Featured*
@@ -66,7 +66,7 @@ A modern, real-time audio-reactive visual effects web application featuring 17 u
 #### 🎵 Classic Spectrum Visualizers
 7. **Spectrum Bars** - 128 FFT bars with gradient glow and peak hold
 8. **Oscilloscope** - Flowing waveform with neon bloom effects
-9. **Radial Bloom** - 180 circular spectrum bars with pulse waves
+9. **Radial Bloom** - Clean circular equalizer with 120 bars around defined ring
 10. **Frequency Rings** - 18 segmented rings (6 render styles, 5 particle modes)
 
 #### 🌊 Particle Systems
@@ -74,13 +74,14 @@ A modern, real-time audio-reactive visual effects web application featuring 17 u
 12. **Constellation** - Connected starfield with transient detection
 
 #### 🔷 Geometric Visualizers
-13. **Geometric Pulse** - Natural wave field with 400 flow particles and 8 energy ribbons (Three.js)
-14. **Reactive Grid** - 3D grid tiles rising with audio intensity
-15. **Kaleidoscope Mirror** - 8-segment mirror with 6 morphing shapes
+13. **Reactive Grid** - 3D grid tiles rising with audio intensity
+14. **Kaleidoscope Mirror** - 8-segment mirror with 6 morphing shapes
 
 #### 🏙️ Thematic Visualizers
-16. **Spectrum City** - Night cityscape with 96 buildings (3 architectural styles)
-17. **Liquid Aurora** - Fluid shader ripples with spectrum mapping
+15. **Spectrum City** - Night cityscape with 96 buildings (3 architectural styles)
+16. **Liquid Aurora** - Fluid shader ripples with spectrum mapping
+17. **DNA Helix** - Endless scrolling tunnel through DNA structure with obstacles
+18. **Matrix Rain** - Falling matrix code with beat detection
 
 ### 🎮 User Interface
 
@@ -529,7 +530,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 🗺️ Roadmap
 
 ### Completed ✅
-- [x] 17 unique visual modes
+- [x] 18 unique visual modes
 - [x] Advanced audio analysis (bass/mid/high separation)
 - [x] Fullscreen support
 - [x] Auto-cycle mode
@@ -537,6 +538,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [x] Dark/Light themes
 - [x] Performance optimizations
 - [x] 20 shapes in Morphing Kaleidoscope
+- [x] Clean circular equalizer (Radial Bloom)
 
 ### In Progress 🚧
 - [ ] Testing infrastructure (Vitest)
