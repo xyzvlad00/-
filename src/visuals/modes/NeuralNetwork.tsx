@@ -34,20 +34,15 @@ export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
       const { width, height } = dims
       timeRef.current += 0.016
 
-      // Initialize flowing neurons
+      // Initialize flowing neurons with completely random distribution
       if (neuronsRef.current.length === 0) {
         for (let i = 0; i < NEURON_COUNT; i++) {
-          // Distribute naturally across screen with some clustering
-          const clusterX = (Math.random() * 3) | 0
-          const clusterY = (Math.random() * 2) | 0
-          const baseX = (clusterX / 3) * width + (Math.random() - 0.5) * width * 0.3
-          const baseY = (clusterY / 2) * height + (Math.random() - 0.5) * height * 0.4
-
+          // Completely random distribution across screen
           neuronsRef.current.push({
-            x: Math.max(50, Math.min(width - 50, baseX)),
-            y: Math.max(50, Math.min(height - 50, baseY)),
-            vx: (Math.random() - 0.5) * 0.5,
-            vy: (Math.random() - 0.5) * 0.5,
+            x: 50 + Math.random() * (width - 100),
+            y: 50 + Math.random() * (height - 100),
+            vx: (Math.random() - 0.5) * 1.2, // Increased velocity for more movement
+            vy: (Math.random() - 0.5) * 1.2,
             activation: 0,
             peakActivation: 0,
             frequency: Math.random(),
@@ -74,7 +69,7 @@ export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
           // Connect to nearest neighbors
           distances.sort((a, b) => a.dist - b.dist)
           for (let c = 0; c < connectionCount && c < distances.length; c++) {
-            if (distances[c].dist < Math.min(width, height) * 0.3) {
+            if (distances[c].dist < Math.min(width, height) * 0.35) {
               neuron.connections.push(distances[c].id)
             }
           }
@@ -90,7 +85,7 @@ export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
       const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
 
       // Update neurons with natural movement
-      neuronsRef.current.forEach((neuron, id) => {
+      neuronsRef.current.forEach((neuron) => {
         // Frequency-based activation
         const freqIndex = Math.floor(neuron.frequency * frame.frequencyData.length * 0.85)
         const magnitude = frame.frequencyData[freqIndex] / 255
@@ -100,54 +95,53 @@ export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
         neuron.activation = Math.max(neuron.activation * 0.92, audioInfluence * 1.8)
         neuron.peakActivation = Math.max(neuron.peakActivation * 0.96, neuron.activation)
 
-        // Natural floating motion
-        neuron.vx += (Math.random() - 0.5) * 0.08 + Math.sin(timeRef.current * 0.5 + id) * 0.02
-        neuron.vy += (Math.random() - 0.5) * 0.08 + Math.cos(timeRef.current * 0.5 + id) * 0.02
+        // Constant random motion with audio influence
+        neuron.vx += (Math.random() - 0.5) * 0.25
+        neuron.vy += (Math.random() - 0.5) * 0.25
 
-        // Flow field influence
-        const flowAngle = Math.sin(neuron.x * 0.008 + timeRef.current) + Math.cos(neuron.y * 0.008 + timeRef.current)
-        neuron.vx += Math.cos(flowAngle) * midEnergy * 0.15
-        neuron.vy += Math.sin(flowAngle) * midEnergy * 0.15
+        // Audio-reactive drift (not circular)
+        neuron.vx += (Math.random() - 0.5) * midEnergy * 0.4
+        neuron.vy += (Math.random() - 0.5) * midEnergy * 0.4
 
-        // Attraction to nearby activated neurons
-        neuronsRef.current.forEach((other, otherId) => {
-          if (id === otherId || other.activation < 0.4) return
-          const dx = other.x - neuron.x
-          const dy = other.y - neuron.y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-
-          if (dist < 200 && dist > 10) {
-            const force = other.activation * 0.015
-            neuron.vx += (dx / dist) * force
-            neuron.vy += (dy / dist) * force
-          }
-        })
+        // Bass adds random bursts
+        if (bassEnergy > 0.6 && Math.random() > 0.95) {
+          neuron.vx += (Math.random() - 0.5) * bassEnergy * 3
+          neuron.vy += (Math.random() - 0.5) * bassEnergy * 3
+        }
 
         // Update position
         neuron.x += neuron.vx
         neuron.y += neuron.vy
 
-        // Friction
-        neuron.vx *= 0.98
-        neuron.vy *= 0.98
+        // Light friction to keep movement smooth but constant
+        neuron.vx *= 0.95
+        neuron.vy *= 0.95
 
-        // Wrap around with soft boundaries
-        const margin = 30
+        // Bounce off boundaries with velocity retention
+        const margin = 40
         if (neuron.x < margin) {
           neuron.x = margin
-          neuron.vx *= -0.5
+          neuron.vx = Math.abs(neuron.vx) * 0.8 + Math.random() * 0.5
         }
         if (neuron.x > width - margin) {
           neuron.x = width - margin
-          neuron.vx *= -0.5
+          neuron.vx = -Math.abs(neuron.vx) * 0.8 - Math.random() * 0.5
         }
         if (neuron.y < margin) {
           neuron.y = margin
-          neuron.vy *= -0.5
+          neuron.vy = Math.abs(neuron.vy) * 0.8 + Math.random() * 0.5
         }
         if (neuron.y > height - margin) {
           neuron.y = height - margin
-          neuron.vy *= -0.5
+          neuron.vy = -Math.abs(neuron.vy) * 0.8 - Math.random() * 0.5
+        }
+
+        // Ensure minimum velocity for constant movement
+        const speed = Math.sqrt(neuron.vx * neuron.vx + neuron.vy * neuron.vy)
+        if (speed < 0.3) {
+          const angle = Math.random() * Math.PI * 2
+          neuron.vx = Math.cos(angle) * 0.5
+          neuron.vy = Math.sin(angle) * 0.5
         }
 
         // Generate pulses on high activation
@@ -272,44 +266,19 @@ export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
         }
       })
 
-      // Energy field visualization
+      // Ambient energy particles (not circular)
       if (midEnergy > 0.5) {
-        const fieldLines = 8
-        ctx.strokeStyle = hsl(timeRef.current * 80 + 200, 75, 60, midEnergy * 0.15)
-        ctx.lineWidth = 1
-        ctx.setLineDash([8, 12])
-
-        for (let i = 0; i < fieldLines; i++) {
-          const y = (i / fieldLines) * height
-          ctx.beginPath()
-          for (let x = 0; x < width; x += 20) {
-            const wave = Math.sin(x * 0.01 + timeRef.current + i) * 30
-            if (x === 0) ctx.moveTo(x, y + wave)
-            else ctx.lineTo(x, y + wave)
-          }
-          ctx.stroke()
-        }
-        ctx.setLineDash([])
-      }
-
-      // Burst effect on high bass
-      if (bassEnergy > 0.75) {
-        const burstCount = 12
-        const burstRadius = Math.min(width, height) * 0.25 + bassEnergy * 100
-
-        for (let b = 0; b < burstCount; b++) {
-          const angle = (b / burstCount) * Math.PI * 2 + timeRef.current * 2
-          const x = width / 2 + Math.cos(angle) * burstRadius
-          const y = height / 2 + Math.sin(angle) * burstRadius
-
-          const burstGradient = createRadialGradient(ctx, x, y, 0, 15, [
-            { offset: 0, color: hsl(timeRef.current * 120 + b * 30, 100, 85, bassEnergy) },
+        const particleCount = Math.floor(midEnergy * 20)
+        for (let p = 0; p < particleCount; p++) {
+          const px = Math.random() * width
+          const py = Math.random() * height
+          const particleGradient = createRadialGradient(ctx, px, py, 0, 8, [
+            { offset: 0, color: hsl(timeRef.current * 100 + p * 18, 85, 70, midEnergy * 0.6) },
             { offset: 1, color: 'rgba(0,0,0,0)' },
           ])
-
-          ctx.fillStyle = burstGradient
+          ctx.fillStyle = particleGradient
           ctx.beginPath()
-          ctx.arc(x, y, 15, 0, Math.PI * 2)
+          ctx.arc(px, py, 8, 0, Math.PI * 2)
           ctx.fill()
         }
       }

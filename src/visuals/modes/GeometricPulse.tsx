@@ -3,9 +3,9 @@ import * as THREE from 'three'
 import type { VisualComponentProps } from '../types'
 import { audioEngine } from '../../audio/AudioEngine'
 
-// Natural flowing wave field with organic depth
-const GRID_SIZE = 50
-const WAVE_PARTICLES = 400
+// Morphing 3D Crystal Lattice - Original geometric visualization
+const CRYSTAL_LAYERS = 6
+const CRYSTALS_PER_LAYER = 10
 
 export function GeometricPulse({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -20,134 +20,169 @@ export function GeometricPulse({ sensitivity, theme }: VisualComponentProps) {
     renderer.setClearColor(0x000000, 0.0)
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.Fog(0x000510, 10, 50)
+    scene.fog = new THREE.Fog(0x000510, 20, 70)
     
     const camera = new THREE.PerspectiveCamera(70, canvas.clientWidth / canvas.clientHeight, 0.1, 100)
-    camera.position.set(0, 8, 12)
+    camera.position.set(0, 6, 22)
     camera.lookAt(0, 0, 0)
 
-    // Soft ambient lighting
-    const ambient = new THREE.AmbientLight(0x304060, 0.5)
+    // Dynamic lighting
+    const ambient = new THREE.AmbientLight(0x202040, 0.8)
     scene.add(ambient)
     
-    // Directional lights for depth
-    const light1 = new THREE.DirectionalLight(0x60a0ff, 1.2)
-    light1.position.set(10, 15, 5)
+    const light1 = new THREE.PointLight(0x00ffff, 2, 50)
+    light1.position.set(10, 15, 10)
     scene.add(light1)
     
-    const light2 = new THREE.DirectionalLight(0xff60a0, 1.0)
-    light2.position.set(-10, 12, -5)
+    const light2 = new THREE.PointLight(0xff00ff, 2, 50)
+    light2.position.set(-10, 15, -10)
     scene.add(light2)
     
-    const light3 = new THREE.PointLight(0xffa060, 1.5, 40)
-    light3.position.set(0, 10, 0)
+    const light3 = new THREE.PointLight(0xffff00, 1.5, 40)
+    light3.position.set(0, 20, 0)
     scene.add(light3)
 
-    // Create flowing wave field
-    const waveGeometry = new THREE.PlaneGeometry(30, 30, GRID_SIZE - 1, GRID_SIZE - 1)
-    const waveMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2040a0,
-      metalness: 0.4,
-      roughness: 0.6,
-      wireframe: false,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.85,
-    })
-    
-    const waveMesh = new THREE.Mesh(waveGeometry, waveMaterial)
-    waveMesh.rotation.x = -Math.PI / 2
-    waveMesh.position.y = 0
-    scene.add(waveMesh)
-
-    const wavePositions = waveGeometry.attributes.position.array as Float32Array
-    const waveCount = wavePositions.length / 3
-    const originalY = new Float32Array(waveCount)
-    for (let i = 0; i < waveCount; i++) {
-      originalY[i] = wavePositions[i * 3 + 1]
+    // Create crystal structures
+    interface Crystal {
+      mesh: THREE.Mesh
+      originalScale: number
+      angle: number
+      radius: number
+      layer: number
+      rotationSpeed: THREE.Vector3
+      pulsePhase: number
+      geometryType: number // 0-5 for different geometries
     }
 
-    // Particle system for flow visualization
+    const crystals: Crystal[] = []
+    const geometryTypes = [
+      new THREE.OctahedronGeometry(1, 0),
+      new THREE.TetrahedronGeometry(1, 0),
+      new THREE.IcosahedronGeometry(1, 0),
+      new THREE.DodecahedronGeometry(1, 0),
+      new THREE.BoxGeometry(1.4, 1.4, 1.4),
+      new THREE.ConeGeometry(0.8, 1.8, 6),
+    ]
+
+    for (let layer = 0; layer < CRYSTAL_LAYERS; layer++) {
+      const layerRadius = 4 + layer * 2
+      const verticalPos = (layer - CRYSTAL_LAYERS / 2) * 2
+
+      for (let i = 0; i < CRYSTALS_PER_LAYER; i++) {
+        const angle = (i / CRYSTALS_PER_LAYER) * Math.PI * 2
+        const geometryType = Math.floor(Math.random() * geometryTypes.length)
+        const geometry = geometryTypes[geometryType].clone()
+
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL((layer * 0.15 + i * 0.05) % 1, 0.85, 0.6),
+          emissive: new THREE.Color().setHSL((layer * 0.15 + i * 0.05) % 1, 1.0, 0.3),
+          emissiveIntensity: 0.5,
+          metalness: 0.7,
+          roughness: 0.2,
+          transparent: true,
+          opacity: 0.85,
+          wireframe: Math.random() > 0.7, // Some crystals are wireframe
+        })
+
+        const mesh = new THREE.Mesh(geometry, material)
+        
+        const x = Math.cos(angle) * layerRadius
+        const z = Math.sin(angle) * layerRadius
+        mesh.position.set(x, verticalPos, z)
+        
+        const scale = 0.6 + Math.random() * 0.6
+        mesh.scale.set(scale, scale, scale)
+
+        scene.add(mesh)
+
+        crystals.push({
+          mesh,
+          originalScale: scale,
+          angle,
+          radius: layerRadius,
+          layer,
+          rotationSpeed: new THREE.Vector3(
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02,
+            (Math.random() - 0.5) * 0.02
+          ),
+          pulsePhase: Math.random() * Math.PI * 2,
+          geometryType,
+        })
+      }
+    }
+
+    // Create connecting beams between crystals
+    const beams: THREE.Line[] = []
+    crystals.forEach((crystal, idx) => {
+      if (idx % 3 === 0 && idx + 1 < crystals.length) {
+        const target = crystals[idx + 1]
+        const points = [
+          crystal.mesh.position,
+          target.mesh.position,
+        ]
+        const geometry = new THREE.BufferGeometry().setFromPoints(points)
+        const material = new THREE.LineBasicMaterial({
+          color: 0x00ffff,
+          transparent: true,
+          opacity: 0.3,
+          linewidth: 2,
+        })
+        const line = new THREE.Line(geometry, material)
+        scene.add(line)
+        beams.push(line)
+      }
+    })
+
+    // Central core sphere
+    const coreGeometry = new THREE.IcosahedronGeometry(1.5, 1)
+    const coreMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00ffff,
+      emissive: 0x00ffff,
+      emissiveIntensity: 1,
+      metalness: 0.8,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.7,
+    })
+    const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial)
+    scene.add(coreMesh)
+
+    // Energy particles orbiting the structure
+    const particleCount = 200
     const particleGeometry = new THREE.BufferGeometry()
-    const particlePositions = new Float32Array(WAVE_PARTICLES * 3)
-    const particleVelocities = new Float32Array(WAVE_PARTICLES * 3)
-    const particleColors = new Float32Array(WAVE_PARTICLES * 3)
-    const particleSizes = new Float32Array(WAVE_PARTICLES)
+    const particlePositions = new Float32Array(particleCount * 3)
+    const particleColors = new Float32Array(particleCount * 3)
     
-    for (let i = 0; i < WAVE_PARTICLES; i++) {
+    for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2
-      const radius = Math.random() * 12
+      const radius = 3 + Math.random() * 18
+      const height = (Math.random() - 0.5) * 12
+      
       particlePositions[i * 3] = Math.cos(angle) * radius
-      particlePositions[i * 3 + 1] = Math.random() * 10 - 2
+      particlePositions[i * 3 + 1] = height
       particlePositions[i * 3 + 2] = Math.sin(angle) * radius
       
-      particleVelocities[i * 3] = (Math.random() - 0.5) * 0.02
-      particleVelocities[i * 3 + 1] = Math.random() * 0.01 + 0.01
-      particleVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02
-      
       const hue = Math.random()
-      const color = new THREE.Color().setHSL(hue, 0.8, 0.6)
+      const color = new THREE.Color().setHSL(hue, 1, 0.6)
       particleColors[i * 3] = color.r
       particleColors[i * 3 + 1] = color.g
       particleColors[i * 3 + 2] = color.b
-      
-      particleSizes[i] = Math.random() * 0.15 + 0.05
     }
     
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3))
     particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3))
-    particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1))
     
     const particleMaterial = new THREE.PointsMaterial({
-      size: 0.15,
+      size: 0.2,
       vertexColors: true,
       blending: THREE.AdditiveBlending,
       transparent: true,
       opacity: 0.8,
-      sizeAttenuation: true,
     })
     
     const particleSystem = new THREE.Points(particleGeometry, particleMaterial)
     scene.add(particleSystem)
-
-    // Flowing energy ribbons
-    const ribbonCount = 8
-    const ribbons: THREE.Mesh[] = []
-    
-    for (let r = 0; r < ribbonCount; r++) {
-      const ribbonGeometry = new THREE.TubeGeometry(
-        new THREE.CatmullRomCurve3([
-          new THREE.Vector3(-15, 0, 0),
-          new THREE.Vector3(-8, 2, 0),
-          new THREE.Vector3(0, 3, 0),
-          new THREE.Vector3(8, 2, 0),
-          new THREE.Vector3(15, 0, 0),
-        ]),
-        64,
-        0.08,
-        8,
-        false
-      )
-      
-      const ribbonMaterial = new THREE.MeshStandardMaterial({
-        color: new THREE.Color().setHSL(r / ribbonCount, 0.9, 0.6),
-        emissive: new THREE.Color().setHSL(r / ribbonCount, 1.0, 0.3),
-        emissiveIntensity: 0.8,
-        metalness: 0.6,
-        roughness: 0.3,
-        transparent: true,
-        opacity: 0.7,
-      })
-      
-      const ribbon = new THREE.Mesh(ribbonGeometry, ribbonMaterial)
-      const angle = (r / ribbonCount) * Math.PI * 2
-      ribbon.position.x = Math.cos(angle) * 5
-      ribbon.position.z = Math.sin(angle) * 5
-      ribbon.position.y = 1
-      ribbon.rotation.y = angle + Math.PI / 2
-      ribbons.push(ribbon)
-      scene.add(ribbon)
-    }
 
     const resize = () => {
       if (!canvas) return
@@ -169,68 +204,84 @@ export function GeometricPulse({ sensitivity, theme }: VisualComponentProps) {
       const data = audioEngine.getFrame()
       time += 0.016
       
-      // Wave field animation
-      for (let i = 0; i < waveCount; i++) {
-        const x = wavePositions[i * 3]
-        const z = wavePositions[i * 3 + 2]
-        
-        // Sample frequency based on position
-        const distFromCenter = Math.sqrt(x * x + z * z)
-        const normalizedDist = Math.min(distFromCenter / 15, 1)
-        const freqIndex = Math.floor(normalizedDist * data.frequencyData.length * 0.8)
+      // Animate crystals
+      crystals.forEach((crystal, idx) => {
+        // Sample frequency based on layer and position
+        const freqIndex = Math.floor((crystal.layer / CRYSTAL_LAYERS + idx / crystals.length * 0.5) * data.frequencyData.length * 0.85)
         const sample = data.frequencyData[freqIndex] / 255
         
-        // Multi-wave interference
-        const wave1 = Math.sin(distFromCenter * 0.4 - time * 1.5) * 0.5
-        const wave2 = Math.cos(x * 0.3 + time * 1.2) * 0.3
-        const wave3 = Math.sin(z * 0.3 - time * 1.0) * 0.3
-        const ripple = Math.sin(distFromCenter * 0.6 - time * 2.0 + sample * Math.PI) * sample * 2
+        // Pulse scale based on audio
+        const pulse = Math.sin(time * 2 + crystal.pulsePhase + sample * Math.PI * 2) * 0.2 + 1
+        const audioPulse = 1 + sample * 1.5 * sensitivity
+        const finalScale = crystal.originalScale * pulse * audioPulse
+        crystal.mesh.scale.set(finalScale, finalScale, finalScale)
         
-        wavePositions[i * 3 + 1] = originalY[i] + (wave1 + wave2 + wave3 + ripple) * sensitivity * 1.5
-      }
-      
-      waveGeometry.attributes.position.needsUpdate = true
-      waveGeometry.computeVertexNormals()
-      
-      // Dynamic wave coloring
-      const waveHue = (time * 0.05 + data.midEnergy * 0.2) % 1
-      waveMaterial.color.setHSL(waveHue, 0.7, 0.5)
-      waveMaterial.emissive.setHSL(waveHue, 0.9, 0.2 + data.overallVolume * 0.3)
-      waveMaterial.emissiveIntensity = 0.3 + data.bassEnergy * 0.7
+        // Rotation
+        crystal.mesh.rotation.x += crystal.rotationSpeed.x * (1 + sample * 2)
+        crystal.mesh.rotation.y += crystal.rotationSpeed.y * (1 + sample * 2)
+        crystal.mesh.rotation.z += crystal.rotationSpeed.z * (1 + sample * 2)
+        
+        // Orbital movement
+        crystal.angle += 0.005 + data.midEnergy * 0.015
+        const orbitRadius = crystal.radius * (1 + data.bassEnergy * 0.3 * sensitivity)
+        crystal.mesh.position.x = Math.cos(crystal.angle) * orbitRadius
+        crystal.mesh.position.z = Math.sin(crystal.angle) * orbitRadius
+        
+        // Vertical oscillation
+        const verticalBase = (crystal.layer - CRYSTAL_LAYERS / 2) * 2
+        crystal.mesh.position.y = verticalBase + Math.sin(time + crystal.pulsePhase) * 0.5 + data.highEnergy * 2 * sensitivity
+        
+        // Dynamic coloring
+        const material = crystal.mesh.material as THREE.MeshStandardMaterial
+        const hue = ((crystal.layer * 0.15 + idx * 0.05 + time * 0.05) % 1)
+        material.color.setHSL(hue, 0.85, 0.5 + sample * 0.4)
+        material.emissive.setHSL(hue, 1.0, 0.2 + sample * 0.5)
+        material.emissiveIntensity = 0.5 + sample * 1.5
+        material.opacity = 0.7 + sample * 0.3
+      })
 
-      // Particle flow system
-      for (let i = 0; i < WAVE_PARTICLES; i++) {
+      // Update connecting beams
+      beams.forEach((beam, idx) => {
+        if (idx * 2 + 1 < crystals.length) {
+          const crystal1 = crystals[idx * 2]
+          const crystal2 = crystals[idx * 2 + 1]
+          const points = [crystal1.mesh.position, crystal2.mesh.position]
+          beam.geometry.setFromPoints(points)
+          
+          const material = beam.material as THREE.LineBasicMaterial
+          material.opacity = 0.2 + data.midEnergy * 0.5
+        }
+      })
+
+      // Animate core
+      coreMesh.rotation.x += 0.01
+      coreMesh.rotation.y += 0.015
+      const coreScale = 1 + data.bassEnergy * 1.2 * sensitivity
+      coreMesh.scale.set(coreScale, coreScale, coreScale)
+      coreMaterial.emissiveIntensity = 0.8 + data.overallVolume * 1.5
+      const coreHue = (time * 0.1) % 1
+      coreMaterial.color.setHSL(coreHue, 1, 0.6)
+      coreMaterial.emissive.setHSL(coreHue, 1, 0.6)
+
+      // Animate particles
+      for (let i = 0; i < particleCount; i++) {
         const idx = i * 3
-        
-        // Update positions
-        particlePositions[idx] += particleVelocities[idx] + (Math.random() - 0.5) * 0.01
-        particlePositions[idx + 1] += particleVelocities[idx + 1] + data.highEnergy * 0.02
-        particlePositions[idx + 2] += particleVelocities[idx + 2] + (Math.random() - 0.5) * 0.01
-        
-        // Spiral force towards center
         const px = particlePositions[idx]
         const pz = particlePositions[idx + 2]
-        const dist = Math.sqrt(px * px + pz * pz)
+        const radius = Math.sqrt(px * px + pz * pz)
+        const angle = Math.atan2(pz, px) + 0.01 + data.midEnergy * 0.02
         
-        if (dist > 0.1) {
-          const angle = Math.atan2(pz, px) + 0.02
-          const pullStrength = 0.015 + data.midEnergy * 0.01
-          particleVelocities[idx] = Math.cos(angle) * dist * pullStrength * 0.1
-          particleVelocities[idx + 2] = Math.sin(angle) * dist * pullStrength * 0.1
-        }
+        particlePositions[idx] = Math.cos(angle) * radius
+        particlePositions[idx + 2] = Math.sin(angle) * radius
+        particlePositions[idx + 1] += (Math.random() - 0.5) * 0.1 + data.highEnergy * 0.15
         
-        // Reset if out of bounds
-        if (particlePositions[idx + 1] > 12 || dist > 15) {
-          const newAngle = Math.random() * Math.PI * 2
-          const newRadius = Math.random() * 10
-          particlePositions[idx] = Math.cos(newAngle) * newRadius
-          particlePositions[idx + 1] = -2 + Math.random() * 2
-          particlePositions[idx + 2] = Math.sin(newAngle) * newRadius
-        }
+        // Wrap vertically
+        if (particlePositions[idx + 1] > 8) particlePositions[idx + 1] = -8
+        if (particlePositions[idx + 1] < -8) particlePositions[idx + 1] = 8
         
         // Update colors
-        const colorHue = (time * 0.05 + (i / WAVE_PARTICLES) * 0.8) % 1
-        const color = new THREE.Color().setHSL(colorHue, 0.85, 0.6 + data.highEnergy * 0.3)
+        const colorHue = (time * 0.05 + (i / particleCount) * 0.7) % 1
+        const color = new THREE.Color().setHSL(colorHue, 1, 0.6 + data.highEnergy * 0.3)
         particleColors[idx] = color.r
         particleColors[idx + 1] = color.g
         particleColors[idx + 2] = color.b
@@ -239,31 +290,25 @@ export function GeometricPulse({ sensitivity, theme }: VisualComponentProps) {
       particleGeometry.attributes.position.needsUpdate = true
       particleGeometry.attributes.color.needsUpdate = true
 
-      // Animate ribbons
-      ribbons.forEach((ribbon, idx) => {
-        const freqIndex = Math.floor((idx / ribbonCount) * data.frequencyData.length)
-        const sample = data.frequencyData[freqIndex] / 255
-        
-        ribbon.position.y = 1 + sample * 3 * sensitivity
-        ribbon.rotation.x = Math.sin(time + idx) * 0.3 + sample * 0.5
-        ribbon.scale.y = 1 + sample * 0.8
-        
-        const material = ribbon.material as THREE.MeshStandardMaterial
-        const hue = ((idx / ribbonCount) + time * 0.03) % 1
-        material.color.setHSL(hue, 0.9, 0.5 + sample * 0.3)
-        material.emissive.setHSL(hue, 1.0, 0.2 + sample * 0.4)
-        material.emissiveIntensity = 0.8 + sample * 1.2
-      })
-
-      // Dynamic camera movement
-      camera.position.y = 8 + Math.sin(time * 0.3) * 1.5 + data.bassEnergy * 2
-      camera.position.z = 12 + Math.cos(time * 0.2) * 2
-      camera.lookAt(0, 0, 0)
-
       // Dynamic lighting
-      light3.intensity = 1.5 + data.overallVolume * 2.5
-      light3.position.y = 10 + data.bassEnergy * 5
-      light3.color.setHSL((time * 0.08) % 1, 1.0, 0.6)
+      light1.intensity = 2 + data.bassEnergy * 3
+      light2.intensity = 2 + data.midEnergy * 3
+      light3.intensity = 1.5 + data.highEnergy * 2.5
+      
+      light1.color.setHSL((time * 0.08) % 1, 1, 0.6)
+      light2.color.setHSL((time * 0.08 + 0.33) % 1, 1, 0.6)
+      light3.color.setHSL((time * 0.08 + 0.66) % 1, 1, 0.6)
+      
+      light1.position.x = Math.cos(time * 0.5) * 15
+      light1.position.z = Math.sin(time * 0.5) * 15
+      light2.position.x = Math.cos(time * 0.5 + Math.PI) * 15
+      light2.position.z = Math.sin(time * 0.5 + Math.PI) * 15
+
+      // Dynamic camera
+      camera.position.y = 6 + Math.sin(time * 0.3) * 2 + data.bassEnergy * 3
+      camera.position.z = 22 + Math.cos(time * 0.2) * 3
+      camera.rotation.z = Math.sin(time * 0.1) * 0.05
+      camera.lookAt(0, 0, 0)
 
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
@@ -275,16 +320,25 @@ export function GeometricPulse({ sensitivity, theme }: VisualComponentProps) {
       cancelAnimationFrame(frame)
       window.removeEventListener('resize', handleResize)
       renderer.dispose()
-      waveGeometry.dispose()
-      waveMaterial.dispose()
+      coreGeometry.dispose()
+      coreMaterial.dispose()
       particleGeometry.dispose()
       particleMaterial.dispose()
-      ribbons.forEach((ribbon) => {
-        ribbon.geometry.dispose()
-        if (Array.isArray(ribbon.material)) {
-          ribbon.material.forEach(m => m.dispose())
+      geometryTypes.forEach(geo => geo.dispose())
+      crystals.forEach((crystal) => {
+        crystal.mesh.geometry.dispose()
+        if (Array.isArray(crystal.mesh.material)) {
+          crystal.mesh.material.forEach(m => m.dispose())
         } else {
-          ribbon.material.dispose()
+          crystal.mesh.material.dispose()
+        }
+      })
+      beams.forEach((beam) => {
+        beam.geometry.dispose()
+        if (Array.isArray(beam.material)) {
+          beam.material.forEach(m => m.dispose())
+        } else {
+          beam.material.dispose()
         }
       })
     }
