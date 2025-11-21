@@ -13,7 +13,6 @@ const KaleidoscopeMirror = lazy(() => import('./modes/KaleidoscopeMirror').then(
 const LiquidSurface = lazy(() => import('./modes/LiquidSurface').then((m) => ({ default: m.LiquidSurface })))
 const Constellation = lazy(() => import('./modes/Constellation').then((m) => ({ default: m.Constellation })))
 const SpectrumCity = lazy(() => import('./modes/SpectrumCity').then((m) => ({ default: m.SpectrumCity })))
-const GeometricPulse = lazy(() => import('./modes/GeometricPulse').then((m) => ({ default: m.GeometricPulse })))
 const MorphingKaleidoscope = lazy(() => import('./modes/MorphingKaleidoscope').then((m) => ({ default: m.MorphingKaleidoscope })))
 const FluidDynamics = lazy(() => import('./modes/FluidDynamics').then((m) => ({ default: m.FluidDynamics })))
 const TunnelVortex = lazy(() => import('./modes/TunnelVortex').then((m) => ({ default: m.TunnelVortex })))
@@ -41,7 +40,6 @@ export const visualRegistry: VisualDefinition[] = [
   { id: 'liquid', name: 'Liquid Aurora', description: 'Fluid shader ripples reacting to spectrum', Component: LiquidSurface },
   { id: 'constellation', name: 'Constellation', description: 'Starfield connections on transients', Component: Constellation },
   { id: 'city', name: 'Spectrum City', description: 'City skyline heights from frequency bands', Component: SpectrumCity },
-  { id: 'geometric', name: 'Geometric Pulse', description: '3D pillars extruded by spectrum energy', Component: GeometricPulse },
   { id: 'dna', name: 'DNA Helix', description: 'Double helix structure with base pair connections', Component: DNAHelix },
   { id: 'matrix', name: 'Matrix Rain', description: 'Falling matrix code with beat detection', Component: MatrixRain },
   { id: 'explosion', name: 'Particle Explosion', description: '3D particle explosions on every beat', Component: ParticleExplosion },

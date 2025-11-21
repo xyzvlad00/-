@@ -1,290 +1,351 @@
-import { useRef } from 'react'
+import { useRef, useEffect } from 'react'
+import * as THREE from 'three'
 import { useCanvasLoop } from '../useCanvasLoop'
 import type { VisualComponentProps } from '../types'
-import { hsl, createRadialGradient, createLinearGradient } from '../utils/colors'
 import { easeAudio } from '../utils/audio'
-import { applyGlow, clearGlow } from '../utils/shapes'
 import { EASING_CURVES } from '../constants'
+import { getMobileOptimizedSettings } from '../../utils/mobile'
 
-// Flowing neural network with natural connections across the screen
+// 3D Neural Network with branching neurons, synaptic firing, and organic growth
+const NEURON_COUNT = 80
+const FIRING_SPEED = 0.05
+const NEURON_LAYERS = 5
+
 interface Neuron {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  activation: number
-  peakActivation: number
-  frequency: number
-  size: number
-  hue: number
+  mesh: THREE.Mesh
+  position: THREE.Vector3
+  layer: number
   connections: number[]
-  pulses: Array<{ targetId: number; progress: number; strength: number }>
+  activationLevel: number
+  fireTime: number
+  pulseSize: number
+  hue: number
 }
 
-const NEURON_COUNT = 150
+interface SynapticSignal {
+  fromIndex: number
+  toIndex: number
+  progress: number
+  strength: number
+  mesh: THREE.Mesh
+}
 
-export function NeuralNetwork({ sensitivity }: VisualComponentProps) {
+export function NeuralNetwork({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const sceneRef = useRef<THREE.Scene | null>(null)
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
   const neuronsRef = useRef<Neuron[]>([])
+  const connectionsRef = useRef<THREE.Line[]>([])
+  const signalsRef = useRef<SynapticSignal[]>([])
   const timeRef = useRef(0)
+
+  const mobileSettings = getMobileOptimizedSettings()
+  const effectiveNeuronCount = Math.floor(NEURON_COUNT * mobileSettings.particleReduction)
+
+  useEffect(() => {
+    if (!canvasRef.current) return
+
+    const scene = new THREE.Scene()
+    sceneRef.current = scene
+    scene.fog = new THREE.Fog(0x000510, 20, 100)
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+    cameraRef.current = camera
+    camera.position.set(0, 0, 40)
+    camera.lookAt(0, 0, 0)
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas: canvasRef.current,
+      antialias: mobileSettings.quality !== 'low',
+      alpha: true,
+    })
+    rendererRef.current = renderer
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * mobileSettings.resolutionScale)
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x303050, 0.6)
+    scene.add(ambientLight)
+
+    const pointLight1 = new THREE.PointLight(0x00ffff, 1.5, 80)
+    pointLight1.position.set(20, 20, 20)
+    scene.add(pointLight1)
+
+    const pointLight2 = new THREE.PointLight(0xff00ff, 1.5, 80)
+    pointLight2.position.set(-20, -20, -20)
+    scene.add(pointLight2)
+
+    // Create neurons in layers
+    const neuronGeometry = new THREE.SphereGeometry(0.4, 12, 12)
+    const layerSpacing = 15
+    const layerWidth = 12
+
+    for (let layer = 0; layer < NEURON_LAYERS; layer++) {
+      const neuronsInLayer = Math.floor(effectiveNeuronCount / NEURON_LAYERS)
+      
+      for (let i = 0; i < neuronsInLayer; i++) {
+        const hue = (layer / NEURON_LAYERS + i * 0.1) % 1
+        
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(hue, 0.8, 0.5),
+          emissive: new THREE.Color().setHSL(hue, 1.0, 0.3),
+          emissiveIntensity: 0.5,
+          metalness: 0.3,
+          roughness: 0.7,
+        })
+
+        const mesh = new THREE.Mesh(neuronGeometry, material)
+
+        // Position in layer with some randomness
+        const angle = (i / neuronsInLayer) * Math.PI * 2
+        const radius = (layerWidth / 2) + (Math.random() - 0.5) * 3
+        const x = Math.cos(angle) * radius
+        const y = Math.sin(angle) * radius + (Math.random() - 0.5) * 4
+        const z = (layer - NEURON_LAYERS / 2) * layerSpacing + (Math.random() - 0.5) * 3
+
+        mesh.position.set(x, y, z)
+        scene.add(mesh)
+
+        neuronsRef.current.push({
+          mesh,
+          position: new THREE.Vector3(x, y, z),
+          layer,
+          connections: [],
+          activationLevel: 0,
+          fireTime: 0,
+          pulseSize: 1,
+          hue,
+        })
+      }
+    }
+
+    // Create connections between neurons (prefer connecting to next layer)
+    const connectionMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.2,
+      linewidth: 1,
+    })
+
+    neuronsRef.current.forEach((neuron, i) => {
+      const maxConnections = 3 + Math.floor(Math.random() * 3)
+      let connectionCount = 0
+
+      // Prefer connecting to next layer
+      for (let j = 0; j < neuronsRef.current.length && connectionCount < maxConnections; j++) {
+        if (i === j) continue
+
+        const other = neuronsRef.current[j]
+        
+        // Higher probability to connect to next layer
+        const isNextLayer = other.layer === neuron.layer + 1
+        const shouldConnect = isNextLayer ? Math.random() < 0.7 : Math.random() < 0.1
+
+        if (shouldConnect) {
+          const dist = neuron.position.distanceTo(other.position)
+          if (dist < 25) {
+            neuron.connections.push(j)
+
+            const points = [neuron.position, other.position]
+            const geometry = new THREE.BufferGeometry().setFromPoints(points)
+            const line = new THREE.Line(geometry, connectionMaterial.clone())
+            connectionsRef.current.push(line)
+            scene.add(line)
+
+            connectionCount++
+          }
+        }
+      }
+    })
+
+    const handleResize = () => {
+      if (!canvasRef.current || !camera || !renderer) return
+      camera.aspect = canvasRef.current.clientWidth / canvasRef.current.clientHeight
+      camera.updateProjectionMatrix()
+      renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight)
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      renderer.dispose()
+      neuronGeometry.dispose()
+      connectionMaterial.dispose()
+      neuronsRef.current.forEach(n => {
+        n.mesh.geometry.dispose()
+        if (!Array.isArray(n.mesh.material)) n.mesh.material.dispose()
+      })
+      connectionsRef.current.forEach(c => {
+        c.geometry.dispose()
+        if (!Array.isArray(c.material)) c.material.dispose()
+      })
+      signalsRef.current.forEach(s => {
+        scene.remove(s.mesh)
+        s.mesh.geometry.dispose()
+        if (!Array.isArray(s.mesh.material)) s.mesh.material.dispose()
+      })
+      scene.clear()
+    }
+  }, [sensitivity, theme, effectiveNeuronCount, mobileSettings.quality, mobileSettings.resolutionScale])
 
   useCanvasLoop(
     canvasRef,
-    (ctx, dims, frame) => {
+    (_ctx, dims, frame) => {
+      if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return
+
       const { width, height } = dims
       timeRef.current += 0.016
 
-      // Initialize flowing neurons with completely random distribution
-      if (neuronsRef.current.length === 0) {
-        for (let i = 0; i < NEURON_COUNT; i++) {
-          // Completely random distribution across screen
-          neuronsRef.current.push({
-            x: 50 + Math.random() * (width - 100),
-            y: 50 + Math.random() * (height - 100),
-            vx: (Math.random() - 0.5) * 1.2, // Increased velocity for more movement
-            vy: (Math.random() - 0.5) * 1.2,
-            activation: 0,
-            peakActivation: 0,
-            frequency: Math.random(),
-            size: 2 + Math.random() * 3,
-            hue: Math.random() * 360,
-            connections: [],
-            pulses: [],
-          })
+      if (rendererRef.current.domElement.width !== width || rendererRef.current.domElement.height !== height) {
+        rendererRef.current.setSize(width, height)
+        if (cameraRef.current) {
+          cameraRef.current.aspect = width / height
+          cameraRef.current.updateProjectionMatrix()
         }
-
-        // Create natural connections (connect to nearby neurons)
-        neuronsRef.current.forEach((neuron, idx) => {
-          const connectionCount = 3 + Math.floor(Math.random() * 4)
-          const distances: Array<{ id: number; dist: number }> = []
-
-          neuronsRef.current.forEach((other, otherId) => {
-            if (idx === otherId) return
-            const dx = other.x - neuron.x
-            const dy = other.y - neuron.y
-            const dist = Math.sqrt(dx * dx + dy * dy)
-            distances.push({ id: otherId, dist })
-          })
-
-          // Connect to nearest neighbors
-          distances.sort((a, b) => a.dist - b.dist)
-          for (let c = 0; c < connectionCount && c < distances.length; c++) {
-            if (distances[c].dist < Math.min(width, height) * 0.35) {
-              neuron.connections.push(distances[c].id)
-            }
-          }
-        })
       }
 
-      // Deep background
-      ctx.fillStyle = 'rgba(0, 0, 10, 0.15)'
-      ctx.fillRect(0, 0, width, height)
-
-      const bassEnergy = easeAudio(frame.bassEnergy, 0.68) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, 0.78) * sensitivity
+      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
+      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
       const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
 
-      // Update neurons with natural movement
-      neuronsRef.current.forEach((neuron) => {
-        // Frequency-based activation
-        const freqIndex = Math.floor(neuron.frequency * frame.frequencyData.length * 0.85)
-        const magnitude = frame.frequencyData[freqIndex] / 255
+      // Trigger neuron firing based on frequency bands
+      const neurons = neuronsRef.current
+      if (neurons.length > 0) {
+        // Fire neurons in different layers based on frequency bands
+        const bassNeuronIndex = Math.floor((bassEnergy * 0.5) * neurons.length)
+        const midNeuronIndex = Math.floor(((midEnergy * 0.5) + 0.25) * neurons.length)
+        const highNeuronIndex = Math.floor(((highEnergy * 0.5) + 0.5) * neurons.length)
 
-        // Audio-reactive activation
-        const audioInfluence = magnitude * sensitivity * (1 + midEnergy * 0.6)
-        neuron.activation = Math.max(neuron.activation * 0.92, audioInfluence * 1.8)
-        neuron.peakActivation = Math.max(neuron.peakActivation * 0.96, neuron.activation)
-
-        // Constant random motion with audio influence
-        neuron.vx += (Math.random() - 0.5) * 0.25
-        neuron.vy += (Math.random() - 0.5) * 0.25
-
-        // Audio-reactive drift (not circular)
-        neuron.vx += (Math.random() - 0.5) * midEnergy * 0.4
-        neuron.vy += (Math.random() - 0.5) * midEnergy * 0.4
-
-        // Bass adds random bursts
-        if (bassEnergy > 0.6 && Math.random() > 0.95) {
-          neuron.vx += (Math.random() - 0.5) * bassEnergy * 3
-          neuron.vy += (Math.random() - 0.5) * bassEnergy * 3
+        if (bassEnergy > 0.3 && neurons[bassNeuronIndex]) {
+          fireNeuron(bassNeuronIndex, bassEnergy, sceneRef.current!)
+        }
+        if (midEnergy > 0.3 && neurons[midNeuronIndex]) {
+          fireNeuron(midNeuronIndex, midEnergy, sceneRef.current!)
+        }
+        if (highEnergy > 0.4 && neurons[highNeuronIndex]) {
+          fireNeuron(highNeuronIndex, highEnergy, sceneRef.current!)
         }
 
-        // Update position
-        neuron.x += neuron.vx
-        neuron.y += neuron.vy
+        // Update neurons
+        neurons.forEach((neuron, i) => {
+          // Decay activation
+          neuron.activationLevel *= 0.95
+          neuron.pulseSize = 1 + neuron.activationLevel * 1.5
 
-        // Light friction to keep movement smooth but constant
-        neuron.vx *= 0.95
-        neuron.vy *= 0.95
+          // Update mesh
+          neuron.mesh.scale.setScalar(neuron.pulseSize)
 
-        // Bounce off boundaries with velocity retention
-        const margin = 40
-        if (neuron.x < margin) {
-          neuron.x = margin
-          neuron.vx = Math.abs(neuron.vx) * 0.8 + Math.random() * 0.5
-        }
-        if (neuron.x > width - margin) {
-          neuron.x = width - margin
-          neuron.vx = -Math.abs(neuron.vx) * 0.8 - Math.random() * 0.5
-        }
-        if (neuron.y < margin) {
-          neuron.y = margin
-          neuron.vy = Math.abs(neuron.vy) * 0.8 + Math.random() * 0.5
-        }
-        if (neuron.y > height - margin) {
-          neuron.y = height - margin
-          neuron.vy = -Math.abs(neuron.vy) * 0.8 - Math.random() * 0.5
-        }
+          const material = neuron.mesh.material as THREE.MeshStandardMaterial
+          material.emissiveIntensity = 0.5 + neuron.activationLevel * 2.5
+          material.opacity = 0.7 + neuron.activationLevel * 0.3
 
-        // Ensure minimum velocity for constant movement
-        const speed = Math.sqrt(neuron.vx * neuron.vx + neuron.vy * neuron.vy)
-        if (speed < 0.3) {
-          const angle = Math.random() * Math.PI * 2
-          neuron.vx = Math.cos(angle) * 0.5
-          neuron.vy = Math.sin(angle) * 0.5
-        }
+          // Slight floating motion
+          neuron.mesh.position.x = neuron.position.x + Math.sin(timeRef.current * 0.5 + i) * 0.3
+          neuron.mesh.position.y = neuron.position.y + Math.cos(timeRef.current * 0.4 + i) * 0.3
 
-        // Generate pulses on high activation
-        if (neuron.activation > 0.65 && Math.random() > 0.92) {
-          neuron.connections.forEach((targetId) => {
-            if (Math.random() > 0.6) {
-              neuron.pulses.push({
-                targetId: targetId,
-                progress: 0,
-                strength: neuron.activation,
-              })
+          // Update color based on activation
+          const hue = (neuron.hue + timeRef.current * 0.02 + neuron.activationLevel * 0.1) % 1
+          material.color.setHSL(hue, 0.8, 0.5 + neuron.activationLevel * 0.3)
+          material.emissive.setHSL(hue, 1.0, 0.3 + neuron.activationLevel * 0.4)
+        })
+
+        // Update connections
+        connectionsRef.current.forEach((line, i) => {
+          const material = line.material as THREE.LineBasicMaterial
+          material.opacity = 0.1 + midEnergy * 0.3
+          material.color.setHSL((timeRef.current * 0.05 + i * 0.01) % 1, 0.8, 0.6)
+        })
+
+        // Update synaptic signals
+        const updatedSignals: SynapticSignal[] = []
+        signalsRef.current.forEach(signal => {
+          signal.progress += FIRING_SPEED * (1 + highEnergy)
+
+          if (signal.progress >= 1) {
+            // Signal reached destination - activate target neuron
+            const targetNeuron = neurons[signal.toIndex]
+            if (targetNeuron) {
+              targetNeuron.activationLevel = Math.min(1, targetNeuron.activationLevel + signal.strength)
+              targetNeuron.fireTime = timeRef.current
+
+              // Propagate signal to connected neurons
+              if (Math.random() < 0.5) {
+                fireNeuron(signal.toIndex, signal.strength * 0.7, sceneRef.current!)
+              }
             }
-          })
-        }
 
-        // Update pulses
-        neuron.pulses = neuron.pulses.filter((pulse) => {
-          pulse.progress += 0.02 + highEnergy * 0.02
-          return pulse.progress < 1
-        })
+            // Remove signal
+            sceneRef.current!.remove(signal.mesh)
+            signal.mesh.geometry.dispose()
+            if (!Array.isArray(signal.mesh.material)) signal.mesh.material.dispose()
+          } else {
+            // Update signal position
+            const from = neurons[signal.fromIndex].position
+            const to = neurons[signal.toIndex].position
+            signal.mesh.position.lerpVectors(from, to, signal.progress)
 
-        // Update hue
-        neuron.hue = (neuron.hue + magnitude * 0.6 + 0.15) % 360
-      })
+            // Update signal appearance
+            const material = signal.mesh.material as THREE.MeshBasicMaterial
+            material.opacity = (1 - signal.progress) * 0.8
+            signal.mesh.scale.setScalar(1 + signal.strength * 2)
 
-      // Render connections
-      neuronsRef.current.forEach((neuron) => {
-        if (neuron.activation < 0.2 && neuron.peakActivation < 0.3) return
-
-        neuron.connections.forEach((targetId) => {
-          const target = neuronsRef.current[targetId]
-          if (!target) return
-
-          const dx = target.x - neuron.x
-          const dy = target.y - neuron.y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-
-          // Only render nearby connections
-          if (dist > 400) return
-
-          const combinedActivation = (neuron.activation + target.activation) / 2
-          if (combinedActivation < 0.15) return
-
-          const alpha = combinedActivation * (1 - dist / 400) * 0.7
-
-          if (alpha < 0.05) return
-
-          // Gradient connection line
-          const avgHue = (neuron.hue + target.hue) / 2
-          const gradient = createLinearGradient(ctx, neuron.x, neuron.y, target.x, target.y, [
-            { offset: 0, color: hsl(neuron.hue, 88, 65, alpha) },
-            { offset: 0.5, color: hsl(avgHue, 92, 70, alpha * 1.2) },
-            { offset: 1, color: hsl(target.hue, 88, 65, alpha) },
-          ])
-
-          ctx.strokeStyle = gradient
-          ctx.lineWidth = 0.8 + combinedActivation * 2.5
-          ctx.lineCap = 'round'
-
-          // Add glow for high activation
-          if (combinedActivation > 0.6) {
-            applyGlow(ctx, hsl(avgHue, 90, 70, alpha * 0.8), 8)
+            updatedSignals.push(signal)
           }
-
-          ctx.beginPath()
-          ctx.moveTo(neuron.x, neuron.y)
-          ctx.lineTo(target.x, target.y)
-          ctx.stroke()
-          clearGlow(ctx)
         })
-
-        // Render pulses
-        neuron.pulses.forEach((pulse) => {
-          const target = neuronsRef.current[pulse.targetId]
-          if (!target) return
-
-          const px = neuron.x + (target.x - neuron.x) * pulse.progress
-          const py = neuron.y + (target.y - neuron.y) * pulse.progress
-          const pulseSize = 3 + pulse.strength * 8
-
-          const gradient = createRadialGradient(ctx, px, py, 0, pulseSize * 2, [
-            { offset: 0, color: hsl(neuron.hue + 180, 100, 88, pulse.strength * (1 - pulse.progress * 0.5)) },
-            { offset: 0.5, color: hsl(neuron.hue + 200, 95, 78, pulse.strength * (1 - pulse.progress * 0.5) * 0.7) },
-            { offset: 1, color: 'rgba(0,0,0,0)' },
-          ])
-
-          ctx.fillStyle = gradient
-          ctx.beginPath()
-          ctx.arc(px, py, pulseSize * 2, 0, Math.PI * 2)
-          ctx.fill()
-        })
-      })
-
-      // Render neurons
-      neuronsRef.current.forEach((neuron) => {
-        const displayActivation = Math.max(neuron.activation, neuron.peakActivation * 0.6)
-        if (displayActivation < 0.15) return
-
-        const renderSize = neuron.size * (1 + displayActivation * 1.5)
-
-        // Outer glow
-        const glowGradient = createRadialGradient(ctx, neuron.x, neuron.y, 0, renderSize * 3.5, [
-          { offset: 0, color: hsl(neuron.hue, 100, 80, displayActivation * 0.9) },
-          { offset: 0.4, color: hsl(neuron.hue + 40, 95, 70, displayActivation * 0.6) },
-          { offset: 0.7, color: hsl(neuron.hue + 80, 90, 60, displayActivation * 0.3) },
-          { offset: 1, color: 'rgba(0,0,0,0)' },
-        ])
-
-        ctx.fillStyle = glowGradient
-        ctx.beginPath()
-        ctx.arc(neuron.x, neuron.y, renderSize * 3.5, 0, Math.PI * 2)
-        ctx.fill()
-
-        // Core
-        if (displayActivation > 0.5) {
-          applyGlow(ctx, hsl(neuron.hue, 100, 80, displayActivation), 10)
-          ctx.fillStyle = hsl(neuron.hue, 100, 90, displayActivation)
-          ctx.beginPath()
-          ctx.arc(neuron.x, neuron.y, renderSize, 0, Math.PI * 2)
-          ctx.fill()
-          clearGlow(ctx)
-        }
-      })
-
-      // Ambient energy particles (not circular)
-      if (midEnergy > 0.5) {
-        const particleCount = Math.floor(midEnergy * 20)
-        for (let p = 0; p < particleCount; p++) {
-          const px = Math.random() * width
-          const py = Math.random() * height
-          const particleGradient = createRadialGradient(ctx, px, py, 0, 8, [
-            { offset: 0, color: hsl(timeRef.current * 100 + p * 18, 85, 70, midEnergy * 0.6) },
-            { offset: 1, color: 'rgba(0,0,0,0)' },
-          ])
-          ctx.fillStyle = particleGradient
-          ctx.beginPath()
-          ctx.arc(px, py, 8, 0, Math.PI * 2)
-          ctx.fill()
-        }
+        signalsRef.current = updatedSignals
       }
+
+      // Camera movement
+      cameraRef.current.position.x = Math.sin(timeRef.current * 0.1) * 20
+      cameraRef.current.position.y = Math.cos(timeRef.current * 0.08) * 10
+      cameraRef.current.lookAt(0, 0, 0)
+
+      // Light movement
+      const lights = sceneRef.current.children.filter(c => c instanceof THREE.PointLight) as THREE.PointLight[]
+      if (lights[0]) {
+        lights[0].intensity = 1.5 + bassEnergy * 2
+        lights[0].color.setHSL((timeRef.current * 0.1) % 1, 1, 0.7)
+      }
+      if (lights[1]) {
+        lights[1].intensity = 1.5 + midEnergy * 2
+        lights[1].color.setHSL((timeRef.current * 0.1 + 0.5) % 1, 1, 0.7)
+      }
+
+      rendererRef.current.render(sceneRef.current, cameraRef.current)
     },
-    [sensitivity],
+    [sensitivity, theme],
   )
 
-  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />
+  // Fire a neuron and send signals to connected neurons
+  function fireNeuron(index: number, strength: number, scene: THREE.Scene) {
+    const neuron = neuronsRef.current[index]
+    if (!neuron) return
+
+    neuron.activationLevel = Math.min(1, strength)
+    neuron.fireTime = timeRef.current
+
+    // Send signals to connected neurons
+    neuron.connections.forEach(targetIndex => {
+      const signalGeometry = new THREE.SphereGeometry(0.3, 8, 8)
+      const signalMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color().setHSL(neuron.hue, 1, 0.7),
+        transparent: true,
+        opacity: 0.8,
+      })
+      const signalMesh = new THREE.Mesh(signalGeometry, signalMaterial)
+      signalMesh.position.copy(neuron.position)
+      scene.add(signalMesh)
+
+      signalsRef.current.push({
+        fromIndex: index,
+        toIndex: targetIndex,
+        progress: 0,
+        strength: strength * 0.8,
+        mesh: signalMesh,
+      })
+    })
+  }
+
+  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />
 }

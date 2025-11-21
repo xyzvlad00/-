@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import { audioEngine } from '../audio/AudioEngine'
 import { useAppStore } from '../state/useAppStore'
@@ -6,10 +7,28 @@ export function PermissionOverlay() {
   const audioStatus = useAppStore((state) => state.audioStatus)
   const audioMessage = useAppStore((state) => state.audioMessage)
   const theme = useAppStore((state) => state.theme)
+  const [isVisible, setIsVisible] = useState(false)
+
+  // Add delay before showing overlay to prevent flashing on mobile
+  useEffect(() => {
+    if (['denied', 'error', 'unsupported', 'suspended'].includes(audioStatus)) {
+      // Show immediately for blocking states
+      setIsVisible(true)
+    } else if (['idle', 'requesting'].includes(audioStatus)) {
+      // Add delay for non-blocking states
+      const timer = setTimeout(() => {
+        setIsVisible(true)
+      }, 500) // 500ms delay to prevent flash
+      return () => clearTimeout(timer)
+    } else {
+      // Hide for listening state
+      setIsVisible(false)
+    }
+  }, [audioStatus])
 
   const shouldShow = ['idle', 'requesting', 'denied', 'error', 'unsupported', 'suspended'].includes(audioStatus)
 
-  if (!shouldShow) {
+  if (!shouldShow || !isVisible) {
     return null
   }
 
