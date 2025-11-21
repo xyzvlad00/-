@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visibility Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui; }
+    .app { min-height: 100vh; background: linear-gradient(to bottom, #05060a, #000); color: white; padding: 2rem; }
+    .header { margin-bottom: 2rem; }
+    .controls { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); padding: 1.5rem; border-radius: 1rem; margin-bottom: 2rem; }
+    .visual { background: rgba(5,6,10,0.7); border: 1px solid rgba(255,255,255,0.05); padding: 2rem; border-radius: 2rem; min-height: 420px; position: relative; }
+    .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); backdrop-filter: blur(16px); }
+    .overlay-card { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 2rem; border-radius: 1.5rem; max-width: 28rem; text-align: center; }
+    .hidden { display: none; }
+    button { background: rgba(64,243,255,0.2); border: 1px solid rgba(64,243,255,0.4); color: white; padding: 0.5rem 1.25rem; border-radius: 1rem; cursor: pointer; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <h1>Live VFX Spectrum</h1>
+      <p>Test visibility</p>
+    </div>
+    <div class="controls">
+      <h2>Visual Modes</h2>
+      <p>Controls panel visible</p>
+    </div>
+    <div class="visual">
+      <p>Visual canvas area</p>
+    </div>
+  </div>
+  
+  <div class="overlay" id="overlay">
+    <div class="overlay-card">
+      <h2>Microphone Access</h2>
+      <p>Requesting permission...</p>
+      <button onclick="document.getElementById('overlay').classList.add('hidden')">Hide Overlay</button>
+    </div>
+  </div>
+</body>
+</html>
+
