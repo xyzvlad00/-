@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import clsx from 'clsx'
 import { Settings2 } from 'lucide-react'
 import { audioEngine } from './audio/AudioEngine'
@@ -24,7 +24,8 @@ function App() {
   const [showMobileControls, setShowMobileControls] = useState(false)
   const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null)
 
-  const mobile = isMobile()
+  // Memoize mobile detection to prevent re-renders
+  const mobile = useMemo(() => isMobile(), [])
 
   useKeyboardShortcuts()
   useTouchGestures() // Mobile gesture support
@@ -137,13 +138,6 @@ function App() {
       
       <InstallPrompt />
       <PerformanceStats show={showPerformance} />
-      
-      {/* Mobile gesture hint */}
-      {mobile && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-black/70 text-white text-xs px-4 py-2 rounded-full backdrop-blur-sm pointer-events-none opacity-0 animate-fade-in z-20">
-          Swipe left/right to change modes
-        </div>
-      )}
     </div>
   )
 }

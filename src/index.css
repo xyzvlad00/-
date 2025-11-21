@@ -81,27 +81,3 @@ input, textarea, [contenteditable] {
 .pr-safe {
   padding-right: var(--safe-area-inset-right);
 }
-
-/* Fade in animation for hints */
-@keyframes fade-in {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-  }
-  10% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  90% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 4s ease-in-out;
-}
