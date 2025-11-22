@@ -25,7 +25,10 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
     canvasRef,
     (ctx, dims, frame, time) => {
       const { width, height } = dims
-      const skylineHeight = height * 0.95 // Increased to 95% for full coverage
+      
+      // Ground is at 92% of height (buildings grow UP from here)
+      const groundY = height * 0.92
+      const maxBuildingHeight = groundY * 0.95 // Buildings can fill up to 95% of the available space
 
       // Initialize buildings
       if (buildingsRef.current.length === 0) {
@@ -36,15 +39,15 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
           buildingsRef.current.push({
             x: (i / BUILDINGS) * width,
             width: buildingWidth,
-            baseHeight: 80 + Math.random() * 120, // Much taller base heights
-            currentHeight: 60,
-            targetHeight: 60,
+            baseHeight: 150 + Math.random() * 250, // Tall base heights
+            currentHeight: 100,
+            targetHeight: 100,
             color: {
               r: 30 + Math.random() * 20,
               g: 35 + Math.random() * 25,
               b: 60 + Math.random() * 40,
             },
-            windows: Array.from({ length: 12 }, (_, w) => ({
+            windows: Array.from({ length: 20 }, (_, w) => ({
               y: w,
               lit: Math.random() > 0.3,
               flicker: Math.random(),
@@ -58,7 +61,7 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
         for (let i = 0; i < 8; i++) {
           cloudsRef.current.push({
             x: Math.random() * width,
-            y: Math.random() * skylineHeight * 0.4,
+            y: Math.random() * groundY * 0.4,
             speed: 0.1 + Math.random() * 0.3,
             size: 40 + Math.random() * 80,
             alpha: 0.1 + Math.random() * 0.15,
@@ -66,18 +69,18 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
         }
       }
 
-      // Night sky gradient
-      const skyGradient = ctx.createLinearGradient(0, 0, 0, skylineHeight)
+      // Night sky gradient (full height)
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, groundY)
       skyGradient.addColorStop(0, '#0a0a1f')
       skyGradient.addColorStop(0.5, '#1a1a35')
       skyGradient.addColorStop(1, '#252540')
       ctx.fillStyle = skyGradient
-      ctx.fillRect(0, 0, width, skylineHeight)
+      ctx.fillRect(0, 0, width, groundY)
 
       // Stars
       for (let i = 0; i < 50; i++) {
         const starX = (i * 137 % width)
-        const starY = (i * 73 % (skylineHeight * 0.7))
+        const starY = (i * 73 % (groundY * 0.6))
         const starAlpha = 0.3 + Math.sin(time * 0.001 + i) * 0.3
         ctx.fillStyle = `rgba(255, 255, 255, ${starAlpha})`
         ctx.fillRect(starX, starY, 1, 1)
@@ -100,40 +103,41 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
       })
 
       // Ground/street
-      const groundGradient = ctx.createLinearGradient(0, skylineHeight, 0, height)
+      const groundGradient = ctx.createLinearGradient(0, groundY, 0, height)
       groundGradient.addColorStop(0, '#1a1a2a')
       groundGradient.addColorStop(1, '#0a0a15')
       ctx.fillStyle = groundGradient
-      ctx.fillRect(0, skylineHeight, width, height - skylineHeight)
+      ctx.fillRect(0, groundY, width, height - groundY)
 
       // Street lights
       const streetLightSpacing = width / 20
       for (let i = 0; i < 20; i++) {
         const x = i * streetLightSpacing + streetLightSpacing / 2
         const glowSize = 30 + frame.overallVolume * 20 * sensitivity
-        const glowGradient = ctx.createRadialGradient(x, skylineHeight + 5, 0, x, skylineHeight + 5, glowSize)
+        const glowGradient = ctx.createRadialGradient(x, groundY + 5, 0, x, groundY + 5, glowSize)
         glowGradient.addColorStop(0, `rgba(255, 200, 100, ${0.4 + frame.overallVolume * 0.3})`)
         glowGradient.addColorStop(0.5, `rgba(255, 180, 80, ${0.2 + frame.overallVolume * 0.2})`)
         glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
         
         ctx.fillStyle = glowGradient
         ctx.beginPath()
-        ctx.arc(x, skylineHeight + 5, glowSize, 0, Math.PI * 2)
+        ctx.arc(x, groundY + 5, glowSize, 0, Math.PI * 2)
         ctx.fill()
       }
 
       const step = Math.floor(frame.frequencyData.length / BUILDINGS)
       
-      // Render buildings
+      // Render buildings (grow UP from ground)
       buildingsRef.current.forEach((building, i) => {
         const sample = frame.frequencyData[i * step] / 255
-        const easedSample = Math.pow(sample, 0.85) * sensitivity * 2.5 // Much more sensitive
+        const easedSample = Math.pow(sample, 0.7) * sensitivity * 3 // Very sensitive
         
-        building.targetHeight = building.baseHeight + easedSample * skylineHeight * 1.5 + frame.bassEnergy * 200 * sensitivity
-        building.currentHeight += (building.targetHeight - building.currentHeight) * 0.2 // Faster response
+        // Buildings grow upward from baseHeight
+        building.targetHeight = building.baseHeight + easedSample * maxBuildingHeight * 0.8 + frame.bassEnergy * 300 * sensitivity
+        building.currentHeight += (building.targetHeight - building.currentHeight) * 0.25 // Fast response
         
-        const buildingHeight = Math.max(20, building.currentHeight)
-        const buildingY = skylineHeight - buildingHeight
+        const buildingHeight = Math.max(50, Math.min(building.currentHeight, maxBuildingHeight))
+        const buildingY = groundY - buildingHeight // Y position (buildings grow UP)
 
         // Building body
         const buildingGradient = ctx.createLinearGradient(building.x, buildingY, building.x + building.width, buildingY)
@@ -146,19 +150,19 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
         // Different building shapes
         ctx.beginPath()
         if (building.style === 'tower') {
-          ctx.moveTo(building.x + building.width * 0.2, skylineHeight)
+          ctx.moveTo(building.x + building.width * 0.2, groundY)
           ctx.lineTo(building.x + building.width * 0.2, buildingY + 20)
           ctx.lineTo(building.x + building.width * 0.5, buildingY)
           ctx.lineTo(building.x + building.width * 0.8, buildingY + 20)
-          ctx.lineTo(building.x + building.width * 0.8, skylineHeight)
+          ctx.lineTo(building.x + building.width * 0.8, groundY)
         } else if (building.style === 'modern') {
           ctx.rect(building.x + 1, buildingY, building.width - 2, buildingHeight)
         } else {
-          ctx.moveTo(building.x + 1, skylineHeight)
+          ctx.moveTo(building.x + 1, groundY)
           ctx.lineTo(building.x + 1, buildingY + 15)
           ctx.lineTo(building.x + building.width / 2, buildingY)
           ctx.lineTo(building.x + building.width - 1, buildingY + 15)
-          ctx.lineTo(building.x + building.width - 1, skylineHeight)
+          ctx.lineTo(building.x + building.width - 1, groundY)
         }
         ctx.closePath()
         ctx.fill()
@@ -170,11 +174,11 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
 
         // Windows
         const windowSize = Math.min(3, building.width / 4)
-        const windowSpacing = Math.max(buildingHeight / 15, 8)
+        const windowSpacing = 14
         
         building.windows.forEach((window) => {
-          const windowY = skylineHeight - window.y * windowSpacing - 12
-          if (windowY < buildingY || windowY > skylineHeight - 8) return
+          const windowY = groundY - window.y * windowSpacing - 20
+          if (windowY < buildingY + 10 || windowY > groundY - 8) return
           
           window.flicker = window.flicker * 0.98 + (Math.random() > 0.95 ? 1 : 0) * 0.02
           
@@ -198,7 +202,7 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
         // Antenna with lights
         if (building.hasAntenna && easedSample > 0.5) {
           const antennaX = building.x + building.width / 2
-          const antennaHeight = 15 + easedSample * 25
+          const antennaHeight = 20 + easedSample * 40
           
           ctx.strokeStyle = `rgba(150, 150, 180, 0.6)`
           ctx.lineWidth = 1.5
@@ -231,13 +235,13 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
       })
 
       // Horizon glow
-      const horizonGradient = ctx.createLinearGradient(0, skylineHeight - 30, 0, skylineHeight + 30)
+      const horizonGradient = ctx.createLinearGradient(0, groundY - 30, 0, groundY + 30)
       horizonGradient.addColorStop(0, 'rgba(0, 0, 0, 0)')
       horizonGradient.addColorStop(0.5, `rgba(255, 180, 120, ${0.15 + frame.bassEnergy * 0.25})`)
       horizonGradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
       
       ctx.fillStyle = horizonGradient
-      ctx.fillRect(0, skylineHeight - 30, width, 60)
+      ctx.fillRect(0, groundY - 30, width, 60)
     },
     [sensitivity],
   )

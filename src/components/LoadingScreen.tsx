@@ -1,391 +1,415 @@
 import { useEffect, useState, useRef } from 'react'
-import { Logo } from './Logo'
 
 interface LoadingScreenProps {
   onComplete: () => void
 }
 
 export function LoadingScreen({ onComplete }: LoadingScreenProps) {
-  const [phase, setPhase] = useState<'intro' | 'loading' | 'melting' | 'complete'>('intro')
   const [progress, setProgress] = useState(0)
-  const [barHeights, setBarHeights] = useState<number[]>([])
+  const [wavePhase, setWavePhase] = useState(0)
+  const [particles, setParticles] = useState<Array<{ angle: number; radius: number; speed: number; size: number; hue: number }>>([])
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const timeRef = useRef(0)
-  const animationFrameRef = useRef<number | null>(null)
-
-  const NUM_BARS = 60
-  const LOGO_BAR_INDEX = 30
+  const rafRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
-    // Initialize bars at low height
-    const initialHeights = Array.from({ length: NUM_BARS }, () => 0.1 + Math.random() * 0.1)
-    setBarHeights(initialHeights)
+    // Initialize particles in orbital pattern
+    const newParticles = Array.from({ length: 120 }, (_, i) => ({
+      angle: (i / 120) * Math.PI * 2,
+      radius: 100 + Math.random() * 150,
+      speed: 0.002 + Math.random() * 0.004,
+      size: 2 + Math.random() * 3,
+      hue: (i / 120) * 360,
+    }))
+    setParticles(newParticles)
 
-    let introProgress = 0
-    let hasStartedLoading = false
-
-    // Smooth animation loop with natural intro
+    // Animate waveforms and particles
     const animate = () => {
       timeRef.current += 0.016
+      setWavePhase(timeRef.current)
 
-      // Intro phase - bars grow naturally
-      if (phase === 'intro' && introProgress < 1) {
-        introProgress += 0.012 // Slower intro
-        setBarHeights(prev => 
-          prev.map((_, i) => {
-            // Staggered growth from left to right
-            const staggerDelay = (i / NUM_BARS) * 0.5
-            const growth = Math.max(0, Math.min(1, introProgress - staggerDelay))
-            const eased = growth * growth * (3 - 2 * growth) // Smooth ease-in-out
-            
-            // Natural randomness
-            const target = 0.3 + Math.random() * 0.3
-            return 0.1 + (target * eased)
-          })
-        )
-        
-        if (introProgress >= 1 && !hasStartedLoading) {
-          hasStartedLoading = true
-          setPhase('loading')
-        }
-      }
-      
-      // Loading phase - natural audio-like movement
-      if (phase === 'loading') {
-        setBarHeights(prev => 
-          prev.map((currentHeight, i) => {
-            // Multiple frequencies like real audio spectrum
-            const position = i / NUM_BARS
-            
-            // Low frequencies (bass) - slower, larger waves on left
-            const bassWave = Math.sin(timeRef.current * 1.8 + position * 0.5) * 0.3 * (1 - position * 0.5)
-            
-            // Mid frequencies - medium waves in middle
-            const midWave = Math.sin(timeRef.current * 3.5 + position * 1.2) * 0.22 * (position < 0.7 ? 1 : 0.5)
-            
-            // High frequencies - faster, smaller waves on right
-            const highWave = Math.sin(timeRef.current * 6 + position * 2) * 0.15 * (position > 0.3 ? 1 : 0.3)
-            
-            // Random energy bursts (like beat hits)
-            const burstChance = Math.random()
-            const burst = burstChance > 0.98 ? Math.random() * 0.25 : 0
-            
-            // Natural target with inertia
-            const targetHeight = 0.35 + bassWave + midWave + highWave + burst
-            
-            // Smooth interpolation (inertia)
-            const newHeight = currentHeight + (targetHeight - currentHeight) * 0.15
-            
-            return Math.max(0.12, Math.min(0.95, newHeight))
-          })
-        )
-      }
+      // Update particles
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        angle: p.angle + p.speed,
+        radius: p.radius + Math.sin(timeRef.current * 2 + p.angle) * 0.5,
+      })))
 
-      animationFrameRef.current = requestAnimationFrame(animate)
+      rafRef.current = requestAnimationFrame(animate)
     }
+    rafRef.current = requestAnimationFrame(animate)
 
-    animationFrameRef.current = requestAnimationFrame(animate)
+    // Progress simulation with musical timing (accelerando)
+    let currentProgress = 0
+    const progressInterval = setInterval(() => {
+      if (currentProgress < 50) {
+        currentProgress += 2.5 // Moderato
+      } else if (currentProgress < 80) {
+        currentProgress += 1.8 // Andante
+      } else if (currentProgress < 95) {
+        currentProgress += 1.0 // Adagio
+      } else {
+        currentProgress += 0.3 // Ritardando
+      }
 
-    // Progress - starts after intro
-    const progressTimer = setTimeout(() => {
-      let currentProgress = 0
-      const progressInterval = setInterval(() => {
-        currentProgress += currentProgress < 60 ? 3.5 : currentProgress < 90 ? 1.8 : 0.7
-        if (currentProgress >= 100) {
-          currentProgress = 100
-          clearInterval(progressInterval)
-        }
-        setProgress(currentProgress)
-      }, 100)
-
-      return () => clearInterval(progressInterval)
-    }, 1200) // Wait for intro to mostly complete
+      if (currentProgress >= 100) {
+        currentProgress = 100
+        clearInterval(progressInterval)
+        setTimeout(() => onComplete(), 600)
+      }
+      setProgress(currentProgress)
+    }, 80)
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current)
-      }
-      clearTimeout(progressTimer)
+      clearInterval(progressInterval)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [phase])
+  }, [onComplete])
 
+  // Draw circular waveform visualization
   useEffect(() => {
-    if (progress >= 100) {
-      setTimeout(() => {
-        setPhase('melting')
-        onComplete()
-        setTimeout(() => {
-          setPhase('complete')
-        }, 2000)
-      }, 300)
-    }
-  }, [progress, onComplete])
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-  const logoHeight = barHeights[LOGO_BAR_INDEX] || 0.5
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = 500 * dpr
+    canvas.height = 500 * dpr
+    canvas.style.width = '500px'
+    canvas.style.height = '500px'
+    ctx.scale(dpr, dpr)
+
+    const centerX = 250
+    const centerY = 250
+    const baseRadius = 140
+
+    ctx.clearRect(0, 0, 500, 500)
+
+    // Draw circular waveforms (like vinyl grooves / sound waves)
+    for (let ring = 0; ring < 5; ring++) {
+      ctx.beginPath()
+      const ringRadius = baseRadius + ring * 25
+      const points = 180
+
+      for (let i = 0; i <= points; i++) {
+        const angle = (i / points) * Math.PI * 2
+        // Multiple frequency waves (like music spectrum)
+        const wave1 = Math.sin(angle * 6 + wavePhase * 2) * 8 * (1 - ring * 0.15)
+        const wave2 = Math.sin(angle * 3 - wavePhase * 1.5) * 5 * (1 - ring * 0.1)
+        const wave3 = Math.sin(angle * 12 + wavePhase * 3) * 3
+        
+        const distortion = wave1 + wave2 + wave3
+        const r = ringRadius + distortion
+        
+        const x = centerX + Math.cos(angle) * r
+        const y = centerY + Math.sin(angle) * r
+
+        if (i === 0) {
+          ctx.moveTo(x, y)
+        } else {
+          ctx.lineTo(x, y)
+        }
+      }
+
+      const hue = (ring * 60 + wavePhase * 20) % 360
+      const gradient = ctx.createLinearGradient(
+        centerX - ringRadius, centerY,
+        centerX + ringRadius, centerY
+      )
+      gradient.addColorStop(0, `hsla(${hue}, 100%, 60%, 0.3)`)
+      gradient.addColorStop(0.5, `hsla(${hue + 40}, 100%, 65%, 0.6)`)
+      gradient.addColorStop(1, `hsla(${hue + 80}, 100%, 70%, 0.3)`)
+      
+      ctx.strokeStyle = gradient
+      ctx.lineWidth = 2.5
+      ctx.shadowBlur = 15
+      ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.5)`
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    }
+
+    // Draw center pulsing core (like a speaker cone)
+    const pulseSize = 35 + Math.sin(wavePhase * 2.5) * 12
+    const coreGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, pulseSize)
+    coreGradient.addColorStop(0, 'hsla(280, 100%, 80%, 1)')
+    coreGradient.addColorStop(0.4, 'hsla(240, 100%, 70%, 0.8)')
+    coreGradient.addColorStop(0.7, 'hsla(200, 100%, 60%, 0.4)')
+    coreGradient.addColorStop(1, 'transparent')
+    
+    ctx.fillStyle = coreGradient
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, pulseSize, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Musical note particles orbiting
+    particles.forEach((p) => {
+      const x = centerX + Math.cos(p.angle) * p.radius
+      const y = centerY + Math.sin(p.angle) * p.radius
+      
+      const particleGradient = ctx.createRadialGradient(x, y, 0, x, y, p.size * 2)
+      particleGradient.addColorStop(0, `hsla(${p.hue}, 100%, 75%, 0.9)`)
+      particleGradient.addColorStop(0.6, `hsla(${p.hue + 30}, 100%, 65%, 0.5)`)
+      particleGradient.addColorStop(1, 'transparent')
+      
+      ctx.fillStyle = particleGradient
+      ctx.beginPath()
+      ctx.arc(x, y, p.size * 2, 0, Math.PI * 2)
+      ctx.fill()
+    })
+
+  }, [wavePhase, particles])
 
   return (
     <div
-      className={`fixed inset-0 flex flex-col items-center justify-center overflow-hidden`}
+      className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
       style={{
-        background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a14 60%, #000000 100%)',
-        opacity: phase === 'complete' ? 0 : 1,
-        transition: phase === 'complete' ? 'opacity 1.2s ease-out 0.5s' : 'none',
+        background: 'radial-gradient(ellipse at center, #0f0f23 0%, #050510 70%, #000000 100%)',
+        opacity: progress >= 100 ? 0 : 1,
+        transition: progress >= 100 ? 'opacity 1s ease-out' : 'none',
         zIndex: 9999,
-        pointerEvents: phase === 'complete' ? 'none' : 'auto',
+        pointerEvents: progress >= 100 ? 'none' : 'auto',
       }}
     >
-      {/* Animated radial pulses */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div 
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-30"
-          style={{
-            background: 'radial-gradient(circle, rgba(20, 184, 166, 0.3) 0%, transparent 70%)',
-            animation: 'pulse-glow 3s ease-in-out infinite',
-          }}
-        />
-        <div 
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20"
-          style={{
-            background: 'radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, transparent 70%)',
-            animation: 'pulse-glow 4s ease-in-out infinite 0.5s',
-          }}
-        />
+      {/* Ambient background particles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 50 }, (_, i) => (
+          <div
+            key={`ambient-${i}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${1 + Math.random() * 2}px`,
+              height: `${1 + Math.random() * 2}px`,
+              background: `hsla(${(i * 7.2) % 360}, 100%, 70%, ${0.3 + Math.random() * 0.4})`,
+              animation: `float-ambient ${20 + Math.random() * 15}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 10}s`,
+              filter: 'blur(0.5px)',
+            }}
+          />
+        ))}
       </div>
 
-      {/* Floating ambient particles */}
-      {phase !== 'intro' && Array.from({ length: 35 }, (_, i) => (
+      {/* Main visualization canvas */}
+      <div className="relative mb-16">
+        <canvas
+          ref={canvasRef}
+          width={500}
+          height={500}
+          className="opacity-90"
+          style={{
+            filter: 'drop-shadow(0 0 40px rgba(139, 92, 246, 0.4))',
+          }}
+        />
+
+        {/* Center logo/icon - Musical symbol */}
         <div
-          key={`ambient-${i}`}
-          className="absolute rounded-full"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           style={{
-            left: `${10 + Math.random() * 80}%`,
-            top: `${10 + Math.random() * 80}%`,
-            width: `${2 + Math.random() * 3}px`,
-            height: `${2 + Math.random() * 3}px`,
-            background: `rgba(${
-              i % 3 === 0 ? '20, 184, 166' : 
-              i % 3 === 1 ? '14, 165, 233' : 
-              '59, 130, 246'
-            }, ${0.3 + Math.random() * 0.4})`,
-            boxShadow: `0 0 10px rgba(${
-              i % 3 === 0 ? '20, 184, 166' : 
-              i % 3 === 1 ? '14, 165, 233' : 
-              '59, 130, 246'
-            }, 0.6)`,
-            animation: `float-unique ${15 + Math.random() * 10}s ease-in-out infinite`,
-            animationDelay: `${Math.random() * 5}s`,
+            transform: `translate(-50%, -50%) scale(${0.9 + Math.sin(wavePhase * 2) * 0.15}) rotate(${Math.sin(wavePhase * 0.8) * 8}deg)`,
+            transition: 'transform 0.1s ease-out',
           }}
-        />
-      ))}
-
-      {/* Equalizer container with glass morphism */}
-      <div 
-        className="relative flex items-end justify-center gap-[3px] h-[60vh] w-[92vw] max-w-6xl rounded-3xl p-8"
-        style={{
-          background: 'rgba(255, 255, 255, 0.02)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
-          boxShadow: '0 20px 80px rgba(0, 0, 0, 0.3)',
-        }}
-      >
-        {/* Inner glow */}
-        <div className="absolute inset-0 rounded-3xl opacity-50 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at center, rgba(20, 184, 166, 0.15) 0%, transparent 60%)',
-          }}
-        />
-
-        {/* Bars */}
-        {barHeights.map((height, i) => {
-          const isLogoBar = i === LOGO_BAR_INDEX
-          const position = i / NUM_BARS
-          
-          // Natural frequency-based colors
-          let hue, saturation, lightness
-          if (position < 0.33) {
-            // Bass - cyan/teal
-            hue = 174 + (position * 3) * 12
-            saturation = 75 + height * 10
-            lightness = 52 + height * 8
-          } else if (position < 0.66) {
-            // Mid - sky blue
-            hue = 186 + ((position - 0.33) * 3) * 18
-            saturation = 80 + height * 8
-            lightness = 55 + height * 8
-          } else {
-            // High - blue
-            hue = 204 + ((position - 0.66) * 3) * 12
-            saturation = 78 + height * 10
-            lightness = 58 + height * 8
-          }
-
-          return (
-            <div
-              key={i}
-              className="relative flex-1 transition-all ease-out"
+        >
+          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+            {/* Treble clef inspired design */}
+            <defs>
+              <linearGradient id="musicGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="hsl(280, 100%, 75%)" />
+                <stop offset="50%" stopColor="hsl(240, 100%, 70%)" />
+                <stop offset="100%" stopColor="hsl(200, 100%, 65%)" />
+              </linearGradient>
+            </defs>
+            {/* Abstract waveform/frequency symbol */}
+            <circle cx="40" cy="40" r="35" stroke="url(#musicGrad)" strokeWidth="2.5" fill="none" opacity="0.4" />
+            <path
+              d="M 25 40 Q 35 20, 40 35 T 55 40 Q 50 55, 40 45 T 25 40"
+              stroke="url(#musicGrad)"
+              strokeWidth="3"
+              fill="none"
+              strokeLinecap="round"
               style={{
-                height: phase === 'loading' || phase === 'intro' ? `${height * 100}%` : '0%',
-                minHeight: phase === 'loading' || phase === 'intro' ? '8%' : '0%',
-                background: isLogoBar
-                  ? `linear-gradient(to top, 
-                      hsl(${hue}, ${saturation}%, ${lightness - 12}%) 0%,
-                      hsl(${hue}, ${saturation + 12}%, ${lightness + 2}%) 50%,
-                      hsl(${hue}, ${saturation + 18}%, ${lightness + 18}%) 100%
-                    )`
-                  : `linear-gradient(to top, 
-                      hsl(${hue}, ${saturation - 8}%, ${lightness - 18}%) 0%,
-                      hsl(${hue}, ${saturation}%, ${lightness - 8}%) 60%,
-                      hsl(${hue}, ${saturation + 8}%, ${lightness + 8}%) 100%
-                    )`,
-                borderRadius: '8px 8px 0 0',
-                boxShadow: isLogoBar
-                  ? `0 0 25px hsla(${hue}, ${saturation}%, ${lightness}%, ${0.6 + height * 0.3}),
-                     0 -15px 35px hsla(${hue}, ${saturation}%, ${lightness}%, ${0.3 + height * 0.2}),
-                     inset 0 -8px 16px rgba(255, 255, 255, ${0.1 + height * 0.08})`
-                  : height > 0.7
-                    ? `0 0 12px hsla(${hue}, ${saturation}%, ${lightness}%, ${height * 0.5}),
-                       inset 0 -4px 8px rgba(255, 255, 255, ${height * 0.08})`
-                    : `0 0 6px hsla(${hue}, ${saturation}%, ${lightness}%, ${height * 0.3})`,
-                transform: phase === 'melting'
-                  ? `scaleY(0) translateY(100%)`
-                  : height > 0.75 ? `scaleY(${1 + (height - 0.75) * 0.08})` : 'scaleY(1)',
-                transformOrigin: 'bottom',
-                opacity: phase === 'melting' ? 0 : (height > 0.35 ? 1 : 0.75 + height * 0.4),
-                filter: height > 0.8 ? `brightness(${1.15 + (height - 0.8) * 0.3}) saturate(1.1)` : 'brightness(1)',
-                transitionDuration: phase === 'melting' ? `${0.8 + Math.random() * 0.5}s` : '0.1s',
-                transitionTimingFunction: phase === 'melting' ? 'cubic-bezier(0.6, 0, 0.8, 1)' : 'ease-out',
-                transitionDelay: phase === 'melting' ? `${i * 0.012}s` : '0s',
+                filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.8))',
               }}
-            >
-              {/* Glossy top highlight */}
-              {height > 0.45 && (phase === 'loading' || phase === 'intro') && (
-                <div
-                  className="absolute top-0 left-0 right-0 h-12 rounded-t-lg pointer-events-none"
-                  style={{
-                    background: `linear-gradient(to bottom, 
-                      rgba(255, 255, 255, ${height * 0.32}) 0%,
-                      rgba(255, 255, 255, ${height * 0.12}) 50%,
-                      transparent 100%
-                    )`,
-                  }}
-                />
-              )}
-
-              {/* Logo */}
-              {isLogoBar && (phase === 'loading' || phase === 'intro') && (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-                  style={{
-                    bottom: '100%',
-                    marginBottom: '25px',
-                    transform: `translate(-50%, 0) scale(${0.88 + logoHeight * 0.35}) rotate(${Math.sin(timeRef.current * 1.8) * 2.5}deg)`,
-                    opacity: phase === 'intro' ? Math.min(1, progress / 20) : 1,
-                  }}
-                >
-                  <Logo isAnimating={phase === 'loading'} size={100} />
-                </div>
-              )}
-            </div>
-          )
-        })}
+            />
+            <circle cx="40" cy="40" r="6" fill="url(#musicGrad)" opacity="0.9" />
+            {/* Frequency rings */}
+            <circle cx="40" cy="40" r="25" stroke="url(#musicGrad)" strokeWidth="1.5" fill="none" opacity="0.25"
+              style={{
+                animation: 'pulse-ring 2s ease-in-out infinite',
+              }}
+            />
+          </svg>
+        </div>
       </div>
 
-      {/* Title with enhanced styling */}
-      <div 
-        className={`mt-20 transition-all duration-1000 ${
-          progress > 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
-        } ${phase === 'melting' ? 'opacity-0 -translate-y-16 scale-110' : ''}`}
-      >
+      {/* Title with musical typography */}
+      <div className="relative z-10 mb-12">
         <h1
-          className="text-6xl font-bold tracking-[0.15em] text-center mb-4"
+          className="text-7xl font-black tracking-[0.25em] text-center mb-3"
           style={{
-            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 30%, #0ea5e9 60%, #3b82f6 100%)',
+            fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
+            background: 'linear-gradient(135deg, #a78bfa 0%, #818cf8 20%, #60a5fa 40%, #38bdf8 60%, #22d3ee 80%, #14b8a6 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            textShadow: '0 0 60px rgba(20, 184, 166, 0.3)',
-            filter: 'drop-shadow(0 4px 20px rgba(14, 165, 233, 0.4))',
+            filter: 'drop-shadow(0 0 30px rgba(139, 92, 246, 0.5))',
+            textTransform: 'uppercase',
+            letterSpacing: '0.15em',
           }}
         >
-          VISUAL CONSTRUCT
+          SONIC
         </h1>
-        <p 
-          className={`text-sm text-gray-400 text-center tracking-[0.3em] uppercase transition-all duration-700 ${
-            progress > 20 ? 'opacity-100' : 'opacity-0'
-          }`}
+        <h2
+          className="text-5xl font-black tracking-[0.35em] text-center"
           style={{
-            textShadow: '0 0 20px rgba(20, 184, 166, 0.3)',
+            fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
+            background: 'linear-gradient(135deg, #14b8a6 0%, #06b6d4 25%, #0ea5e9 50%, #3b82f6 75%, #8b5cf6 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            filter: 'drop-shadow(0 0 25px rgba(56, 189, 248, 0.5))',
+            textTransform: 'uppercase',
+            letterSpacing: '0.18em',
+            marginLeft: '0.18em',
           }}
         >
-          Audio Reactive Experience
+          CANVAS
+        </h2>
+        <p
+          className="text-center mt-4 text-sm tracking-[0.4em] uppercase"
+          style={{
+            background: 'linear-gradient(90deg, #a78bfa, #60a5fa, #22d3ee)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            opacity: progress > 20 ? 1 : 0,
+            transition: 'opacity 0.8s ease-out',
+            fontWeight: 600,
+            letterSpacing: '0.4em',
+            marginLeft: '0.4em',
+          }}
+        >
+          Where Sound Becomes Vision
         </p>
       </div>
 
-      {/* Sleek progress bar */}
-      <div
-        className={`mt-12 w-[500px] max-w-[90vw] transition-all duration-700 ${
-          progress > 15 ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-        } ${phase === 'melting' ? 'opacity-0 scale-90' : ''}`}
-      >
-        <div className="relative h-2 bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+      {/* Progress bar with frequency band styling */}
+      <div className="relative w-[600px] max-w-[90vw]">
+        {/* Frequency band indicators */}
+        <div className="flex justify-between text-[10px] text-gray-500 uppercase tracking-widest mb-2 px-1"
+          style={{
+            opacity: progress > 15 ? 1 : 0,
+            transition: 'opacity 0.6s ease-out',
+            fontWeight: 600,
+          }}
+        >
+          <span style={{ color: 'hsl(280, 70%, 65%)' }}>Bass</span>
+          <span style={{ color: 'hsl(240, 70%, 65%)' }}>Mid</span>
+          <span style={{ color: 'hsl(200, 70%, 65%)' }}>High</span>
+        </div>
+
+        {/* Progress bar with frequency visualization style */}
+        <div
+          className="relative h-3 rounded-full overflow-hidden"
+          style={{
+            background: 'linear-gradient(90deg, rgba(167, 139, 250, 0.1) 0%, rgba(96, 165, 250, 0.1) 50%, rgba(34, 211, 238, 0.1) 100%)',
+            boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.5)',
+            opacity: progress > 10 ? 1 : 0,
+            transform: progress > 10 ? 'scaleY(1)' : 'scaleY(0)',
+            transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {/* Animated progress fill with frequency colors */}
           <div
             className="absolute inset-y-0 left-0 rounded-full"
             style={{
               width: `${progress}%`,
-              background: 'linear-gradient(90deg, #14b8a6 0%, #06b6d4 25%, #0ea5e9 50%, #3b82f6 75%, #6366f1 100%)',
-              boxShadow: '0 0 25px rgba(20, 184, 166, 0.8), 0 0 50px rgba(14, 165, 233, 0.5)',
-              transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              background: 'linear-gradient(90deg, #a78bfa 0%, #818cf8 15%, #60a5fa 30%, #38bdf8 50%, #22d3ee 70%, #14b8a6 100%)',
+              boxShadow: '0 0 20px rgba(139, 92, 246, 0.6), 0 0 40px rgba(56, 189, 248, 0.4)',
+              transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
+            {/* Shimmer effect */}
             <div
-              className="absolute inset-0 rounded-full opacity-60"
+              className="absolute inset-0 rounded-full"
               style={{
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)',
-                animation: 'shimmer 2s ease-in-out infinite',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)',
+                animation: 'shimmer-fast 1.5s ease-in-out infinite',
               }}
             />
           </div>
-        </div>
 
-        <div
-          className="mt-5 text-center text-lg font-bold font-mono"
-          style={{
-            background: 'linear-gradient(90deg, #14b8a6, #0ea5e9, #3b82f6)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            textShadow: '0 0 30px rgba(20, 184, 166, 0.5)',
-          }}
-        >
-          {Math.floor(progress)}%
-        </div>
-      </div>
-
-      {/* Melting effect */}
-      {phase === 'melting' && (
-        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 100 }, (_, i) => (
+          {/* Frequency peaks indicators */}
+          {[25, 50, 75].map(pos => (
             <div
-              key={`melt-${i}`}
-              className="absolute"
+              key={pos}
+              className="absolute top-0 bottom-0 w-[2px]"
               style={{
-                left: `${(i / 100) * 100}%`,
-                top: '38%',
-                width: `${2 + Math.random() * 2}px`,
-                height: `${100 + Math.random() * 150}px`,
-                background: `linear-gradient(to bottom, 
-                  hsla(${174 + (i / 100) * 40}, 80%, 60%, 0.9) 0%,
-                  hsla(${174 + (i / 100) * 40}, 80%, 50%, 0.6) 40%,
-                  transparent 100%
-                )`,
-                boxShadow: `0 0 10px hsla(${174 + (i / 100) * 40}, 80%, 60%, 0.6)`,
-                filter: 'blur(0.8px)',
-                animation: `drip-fall ${0.9 + Math.random() * 0.6}s cubic-bezier(0.5, 0, 0.7, 1) forwards`,
-                animationDelay: `${i * 0.01}s`,
+                left: `${pos}%`,
+                background: progress > pos
+                  ? 'rgba(255, 255, 255, 0.4)'
+                  : 'rgba(255, 255, 255, 0.1)',
+                transition: 'background 0.3s ease-out',
               }}
             />
           ))}
         </div>
-      )}
+
+        {/* Progress percentage with beat timing */}
+        <div
+          className="mt-6 text-center"
+          style={{
+            fontFamily: "'SF Mono', 'Monaco', 'Courier New', monospace",
+            fontSize: '28px',
+            fontWeight: 'bold',
+            background: 'linear-gradient(90deg, #a78bfa, #60a5fa, #22d3ee)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            opacity: progress > 10 ? 1 : 0,
+            transform: progress > 10 ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+            letterSpacing: '0.1em',
+          }}
+        >
+          {Math.floor(progress)}
+          <span style={{ fontSize: '20px', opacity: 0.7 }}>%</span>
+        </div>
+
+        {/* Loading text with musical terms */}
+        <div
+          className="mt-3 text-center text-xs tracking-[0.3em] uppercase"
+          style={{
+            color: 'rgba(168, 139, 250, 0.7)',
+            opacity: progress > 15 ? 1 : 0,
+            transition: 'opacity 0.8s ease-out',
+            fontWeight: 600,
+          }}
+        >
+          {progress < 30 ? 'Tuning Frequencies...' :
+           progress < 60 ? 'Calibrating Harmonics...' :
+           progress < 90 ? 'Synchronizing Rhythm...' :
+           'Finalizing Canvas...'}
+        </div>
+      </div>
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes float-ambient {
+          0%, 100% { transform: translate(0, 0); opacity: 0.3; }
+          50% { transform: translate(${Math.random() * 40 - 20}px, ${Math.random() * 40 - 20}px); opacity: 0.8; }
+        }
+        @keyframes shimmer-fast {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        @keyframes pulse-ring {
+          0%, 100% { opacity: 0.25; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.05); }
+        }
+      `}</style>
     </div>
   )
 }
