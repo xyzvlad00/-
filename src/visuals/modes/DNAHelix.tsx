@@ -10,9 +10,9 @@ function DNAHelix({ sensitivity, theme }: VisualComponentProps) {
   const scrollOffsetRef = useRef(0)
   const timeRef = useRef(0)
 
-  const HELIX_RADIUS = 80
-  const SEGMENT_HEIGHT = 40
-  const NUM_SEGMENTS = 30
+  const helixRadiusRef = useRef(80)
+  const segmentHeightRef = useRef(40)
+  const NUM_SEGMENTS = 35
 
   useCanvasLoop(
     canvasRef,
@@ -30,23 +30,27 @@ function DNAHelix({ sensitivity, theme }: VisualComponentProps) {
       const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
 
       // Scroll speed increases with audio
-      const scrollSpeed = 2 + midEnergy * 4
+      const scrollSpeed = 3 + midEnergy * 8 + bassEnergy * 5
       scrollOffsetRef.current += scrollSpeed
+
+      // Dynamic helix size based on screen and audio
+      helixRadiusRef.current = Math.min(width, height) * 0.15 + bassEnergy * 40
+      segmentHeightRef.current = 30 + highEnergy * 15
 
       // Draw DNA helix segments
       for (let i = -5; i < NUM_SEGMENTS; i++) {
-        const y = (i * SEGMENT_HEIGHT - scrollOffsetRef.current % SEGMENT_HEIGHT) + height / 2
+        const y = (i * segmentHeightRef.current - scrollOffsetRef.current % segmentHeightRef.current) + height / 2
         
         if (y < -50 || y > height + 50) continue
 
-        const t = (scrollOffsetRef.current / SEGMENT_HEIGHT + i) * 0.3
+        const t = (scrollOffsetRef.current / segmentHeightRef.current + i) * 0.3
         
         // Left strand position
-        const leftX = centerX + Math.sin(t) * HELIX_RADIUS
+        const leftX = centerX + Math.sin(t) * helixRadiusRef.current
         const leftZ = Math.cos(t) // Depth
         
         // Right strand position (180 degrees offset)
-        const rightX = centerX + Math.sin(t + Math.PI) * HELIX_RADIUS
+        const rightX = centerX + Math.sin(t + Math.PI) * helixRadiusRef.current
         const rightZ = Math.cos(t + Math.PI) // Depth
 
         // Draw connections between strands
@@ -58,8 +62,8 @@ function DNAHelix({ sensitivity, theme }: VisualComponentProps) {
           ctx.lineWidth = 2
           ctx.stroke()
 
-          // Base pairs
-          const baseSize = 4 + bassEnergy * 4
+          // Base pairs (larger and more reactive)
+          const baseSize = 6 + bassEnergy * 8 + highEnergy * 6
           
           // Left base
           ctx.beginPath()
@@ -78,8 +82,8 @@ function DNAHelix({ sensitivity, theme }: VisualComponentProps) {
           ctx.shadowBlur = 0
         }
 
-        // Draw strand tubes with perspective
-        const strandWidth = 8 + Math.abs(leftZ) * 4
+        // Draw strand tubes with perspective (larger, more visible)
+        const strandWidth = 12 + Math.abs(leftZ) * 8 + midEnergy * 6
         
         // Left strand
         ctx.beginPath()
@@ -112,20 +116,38 @@ function DNAHelix({ sensitivity, theme }: VisualComponentProps) {
       const distance = Math.floor(scrollOffsetRef.current / 10)
       ctx.fillText(`DISTANCE: ${distance}m`, 15, 55)
 
-      // Pulsing glow effects
-      for (let i = 0; i < 3; i++) {
-        const ringY = height / 2 + Math.sin(timeRef.current * 2 + i) * highEnergy * 50
+      // Pulsing glow effects (enhanced)
+      for (let i = 0; i < 5; i++) {
+        const ringY = height / 2 + Math.sin(timeRef.current * 2 + i) * highEnergy * 80
         ctx.beginPath()
-        ctx.arc(centerX, ringY, HELIX_RADIUS * 1.5, 0, Math.PI * 2)
-        ctx.strokeStyle = `hsla(${(timeRef.current * 50 + i * 120) % 360}, 90%, 60%, ${0.15 - i * 0.04})`
-        ctx.lineWidth = 3
+        ctx.arc(centerX, ringY, helixRadiusRef.current * (1.8 + i * 0.3), 0, Math.PI * 2)
+        ctx.strokeStyle = `hsla(${(timeRef.current * 60 + i * 72) % 360}, 90%, 65%, ${(0.25 - i * 0.04) * (1 + bassEnergy)})`
+        ctx.lineWidth = 4 + bassEnergy * 4
         ctx.stroke()
+      }
+      
+      // Add particle effects along the helix
+      if (highEnergy > 0.3) {
+        for (let p = 0; p < 10; p++) {
+          const particleT = (scrollOffsetRef.current * 0.02 + p * 0.5) % (Math.PI * 2)
+          const particleX = centerX + Math.sin(particleT) * helixRadiusRef.current
+          const particleY = height / 2 + (p - 5) * 50
+          const particleSize = 3 + highEnergy * 5
+          
+          ctx.beginPath()
+          ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2)
+          ctx.fillStyle = `hsla(${(particleT * 100 + 180) % 360}, 100%, 70%, ${highEnergy})`
+          ctx.shadowBlur = 15 + highEnergy * 15
+          ctx.shadowColor = `hsla(${(particleT * 100 + 180) % 360}, 100%, 70%, ${highEnergy})`
+          ctx.fill()
+          ctx.shadowBlur = 0
+        }
       }
     },
     [sensitivity, theme],
   )
 
-  return <canvas ref={canvasRef} className="block w-full rounded-3xl bg-black/30" style={{ height: '420px', maxHeight: '420px' }} />
+  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />
 }
 
 export default DNAHelix

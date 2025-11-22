@@ -212,7 +212,7 @@ function NeuralNetwork({ sensitivity, theme }: VisualComponentProps) {
     })
   }
 
-  return <canvas ref={canvasRef} className="block w-full rounded-3xl" style={{ height: '420px', maxHeight: '420px' }} />
+  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/20" />
 }
 
 export default NeuralNetwork

@@ -25,7 +25,7 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
     canvasRef,
     (ctx, dims, frame, time) => {
       const { width, height } = dims
-      const skylineHeight = height * 0.62
+      const skylineHeight = height * 0.85 // Increased from 0.62 for better fullscreen coverage
 
       // Initialize buildings
       if (buildingsRef.current.length === 0) {
@@ -127,10 +127,10 @@ function SpectrumCity({ sensitivity }: VisualComponentProps) {
       // Render buildings
       buildingsRef.current.forEach((building, i) => {
         const sample = frame.frequencyData[i * step] / 255
-        const easedSample = Math.pow(sample, 1.15) * sensitivity
+        const easedSample = Math.pow(sample, 0.95) * sensitivity * 1.5 // Increased sensitivity
         
-        building.targetHeight = building.baseHeight + easedSample * skylineHeight * 0.9 + frame.bassEnergy * 60
-        building.currentHeight += (building.targetHeight - building.currentHeight) * 0.15
+        building.targetHeight = building.baseHeight + easedSample * skylineHeight * 1.2 + frame.bassEnergy * 120 * sensitivity
+        building.currentHeight += (building.targetHeight - building.currentHeight) * 0.2 // Faster response
         
         const buildingHeight = Math.max(20, building.currentHeight)
         const buildingY = skylineHeight - buildingHeight
