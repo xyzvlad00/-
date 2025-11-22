@@ -16,9 +16,11 @@ export function useCanvasLoop(canvasRef: RefObject<HTMLCanvasElement | null>, dr
 
     let raf: number
     let lastTime = performance.now()
+    let resizeTimeout: ReturnType<typeof setTimeout> | undefined
 
     const resize = () => {
-      const ratio = window.devicePixelRatio || 1
+      // Cap DPR at 2 to prevent 4× overhead on high-DPI displays
+      const ratio = Math.min(window.devicePixelRatio || 1, 2)
       const bounds = canvas.getBoundingClientRect()
       const fallbackWidth = canvas.width || 640
       const fallbackHeight = canvas.height || 360
@@ -40,8 +42,16 @@ export function useCanvasLoop(canvasRef: RefObject<HTMLCanvasElement | null>, dr
       raf = requestAnimationFrame(render)
     }
 
-    const handleResize = () => resize()
-    const resizeObserver = new ResizeObserver(() => resize())
+    // Debounced resize handler (prevents excessive reallocation)
+    const handleResize = () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(resize, 100)
+    }
+    
+    const resizeObserver = new ResizeObserver(() => {
+      if (resizeTimeout) clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(resize, 100)
+    })
     resizeObserver.observe(canvas)
     window.addEventListener('resize', handleResize)
     resize()
@@ -49,6 +59,7 @@ export function useCanvasLoop(canvasRef: RefObject<HTMLCanvasElement | null>, dr
 
     return () => {
       cancelAnimationFrame(raf)
+      if (resizeTimeout) clearTimeout(resizeTimeout)
       window.removeEventListener('resize', handleResize)
       resizeObserver.disconnect()
     }

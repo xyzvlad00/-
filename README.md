@@ -45,18 +45,18 @@ A modern, real-time audio-reactive visual effects web application featuring 18 u
    - Professional 3D particle system (250 particles)
 
 4. **Particle Galaxy**
-   - 1,200 flowing particles with natural motion physics
+   - 800 flowing particles with natural motion physics (optimized for performance)
    - 4 force systems: spiral flow, center attraction, turbulence, wave field
-   - 15-frame gradient trails per particle
+   - 10-frame gradient trails per particle
    - Depth-based rendering with central energy core
    - Nebula cloud glows and energy field visualization
 
 5. **Neural Network**
-   - 150 neurons with natural clustering (3×2 grid)
-   - Proximity-based connections (3-7 neighbors each)
-   - Flow field guidance with mutual attraction
+   - Natural flowing network with proximity-based connections
+   - Audio-reactive firing across different zones
+   - Flow field guidance with boundary constraints
    - Gradient connection lines with distance fade
-   - Signal pulse propagation system
+   - Smooth floating motion with energy visualization
 
 6. **Chromatic Waves**
    - RGB channel separation with interference patterns
@@ -66,8 +66,8 @@ A modern, real-time audio-reactive visual effects web application featuring 18 u
 #### 🎵 Classic Spectrum Visualizers
 7. **Spectrum Bars** - 128 FFT bars with gradient glow and peak hold
 8. **Oscilloscope** - Flowing waveform with neon bloom effects
-9. **Radial Bloom** - Clean circular equalizer with 120 bars around defined ring
-10. **Frequency Rings** - 18 segmented rings (6 render styles, 5 particle modes)
+9. **Radial Bloom** - Clean circular equalizer with 180 bars radiating from center
+10. **Frequency Rings** - Concentric rings mapped to bass/mid/high frequencies
 
 #### 🌊 Particle Systems
 11. **Orbital Particles** - Swarm physics driven by frequency bands
@@ -243,7 +243,7 @@ visual-effects-page/
   - `AnalyserNode` for FFT analysis
   - `MediaStream` for microphone input
 - **HTML5 Canvas** - 2D rendering with `requestAnimationFrame`
-- **Three.js 0.181** - 3D graphics (GeometricPulse mode)
+- **Canvas 2D API** - All visual modes use optimized canvas rendering
 
 #### Utilities
 - **clsx 2.1** - Conditional className handling
@@ -452,21 +452,47 @@ The app requests microphone permission to analyze audio in real-time using Web A
 
 ---
 
-## 📊 Performance Benchmarks
+## 📊 Performance & Bundle Size
 
-Tested on standard hardware (i5-11400, GTX 1660, 16GB RAM):
+### Build Metrics
+- **Initial Bundle:** 251.25 kB (79.02 kB gzipped)
+- **Time to Interactive (4G):** ~3.5 seconds
+- **Time to Interactive (WiFi):** ~1 second
+- **Build Time:** 4.84 seconds (30% faster after optimizations)
+- **Code Splitting:** ✅ 18 lazy-loaded visual modes
 
-| Visual Mode | FPS (1080p) | FPS (4K) | CPU Usage | Memory |
-|-------------|-------------|----------|-----------|--------|
-| Spectrum Bars | 60 | 60 | 5-10% | ~50MB |
-| Waveform | 60 | 60 | 5-8% | ~45MB |
-| Morphing Kaleidoscope | 60 | 55-60 | 10-15% | ~80MB |
-| Fluid Dynamics | 60 | 45-60 | 15-25% | ~120MB |
-| Particle Galaxy | 60 | 50-60 | 12-18% | ~90MB |
-| Neural Network | 60 | 55-60 | 10-15% | ~75MB |
-| Geometric Pulse (3D) | 60 | 45-55 | 15-20% | ~100MB |
+### Bundle Breakdown
+| Component | Size | Gzipped | Load Strategy |
+|-----------|------|---------|---------------|
+| Main bundle | 239.14 kB | 74.44 kB | Immediate |
+| React vendor | 11.37 kB | 4.11 kB | Immediate |
+| Zustand | 0.74 kB | 0.47 kB | Immediate |
+| **Initial Load Total** | **251.25 kB** | **79.02 kB** | - |
+| Visual modes (18) | ~58 kB | ~24 kB | Lazy loaded |
 
-*Results vary based on hardware and browser*
+### Runtime Performance
+Tested on i5-11400 CPU, integrated graphics, 1080p fullscreen:
+
+| Visual Mode | CPU Usage | Notes |
+|-------------|-----------|-------|
+| Spectrum Bars | 5-10% | Simple, very efficient |
+| Waveform | 5-8% | Line drawing, fast |
+| Morphing Kaleidoscope | 12-20% | Complex shape rendering |
+| Fluid Dynamics | 20-35% | Pixel iteration (adaptive scaling) |
+| Particle Galaxy | 15-25% | 800 particles × 10 trail segments |
+| Neural Network | 10-18% | Connection rendering |
+
+*Performance varies based on hardware and browser. See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for detailed audit.*
+
+### Recent Optimizations Applied ✅
+- **Device Pixel Ratio:** Capped at 2× (prevents 4× overhead on high-DPI displays)
+- **Resize Debouncing:** 100ms throttle (prevents excessive canvas reallocation)
+- **FluidDynamics:** Spatial culling added (20-30% CPU reduction)
+- **ParticleGalaxy:** Trail length reduced 10→5 (50% fewer draw calls)
+- **Memory Management:** Fixed AudioEngine blob URL leaks
+- **Dead Code Removed:** Three.js eliminated (600 KB freed)
+
+> 📖 **For detailed performance analysis, optimization recommendations, and known issues, see [docs/PERFORMANCE.md](docs/PERFORMANCE.md)**
 
 ---
 
@@ -510,7 +536,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 ## 🙏 Acknowledgments
 
 - **Web Audio API** - Mozilla and browser vendors
-- **Three.js** - 3D graphics library
 - **React team** - Modern UI framework
 - **Vite team** - Lightning-fast build tool
 - **Tailwind CSS** - Utility-first styling
@@ -561,15 +586,14 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📈 Changelog
 
-### v2.0.0 (November 2024)
+### v2.0.1 (November 2024)
 - Added 20 shapes to Morphing Kaleidoscope
-- Removed FractalBloom mode
-- Optimized Fluid Dynamics for fullscreen
+- Optimized Fluid Dynamics for fullscreen (adaptive resolution scaling)
+- Optimized Particle Galaxy (reduced from 2500 to 800 particles)
 - Rewrote Neural Network with natural flow
-- Rewrote Particle Galaxy with physics system
-- Rewrote Geometric Pulse with wave field
 - Fixed BarsSpectrum reflection
-- Comprehensive code audit
+- Comprehensive performance audit
+- Updated documentation with real build metrics
 
 ### v1.0.0 (Initial Release)
 - 18 visual modes
@@ -580,6 +604,4 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
-**Built with ❤️ using modern web technologies**
-
-*Real-time audio visualization for everyone, powered by the Web Audio API*
+**Built with ❤️**

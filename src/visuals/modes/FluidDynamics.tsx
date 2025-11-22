@@ -130,14 +130,32 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
         radiusSq: ball.radius * ball.radius,
         energy: ball.energy,
         hue: ball.hue,
+        maxInfluence: ball.radius * 2.5,
         maxInfluenceSq: (ball.radius * 2.5) * (ball.radius * 2.5)
       }))
 
-      for (let py = 0; py < renderHeight; py++) {
+      // Calculate bounding box for spatial culling
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (const ball of ballData) {
+        const radius = ball.maxInfluence
+        minX = Math.min(minX, ball.x - radius)
+        minY = Math.min(minY, ball.y - radius)
+        maxX = Math.max(maxX, ball.x + radius)
+        maxY = Math.max(maxY, ball.y + radius)
+      }
+      
+      // Convert world coordinates to pixel coordinates
+      const startPy = Math.max(0, Math.floor(minY / scaleY))
+      const endPy = Math.min(renderHeight, Math.ceil(maxY / scaleY))
+      const startPx = Math.max(0, Math.floor(minX / scaleX))
+      const endPx = Math.min(renderWidth, Math.ceil(maxX / scaleX))
+
+      // Only process pixels within the bounding box
+      for (let py = startPy; py < endPy; py++) {
         const worldY = py * scaleY
         const baseIdx = py * renderWidth * 4
         
-        for (let px = 0; px < renderWidth; px++) {
+        for (let px = startPx; px < endPx; px++) {
           const worldX = px * scaleX
           
           let sum = 0

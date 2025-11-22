@@ -21,7 +21,7 @@ interface Star {
 }
 
 const STAR_COUNT = 800 // Optimized for performance
-const TRAIL_LENGTH = 10 // Reduced trail length
+const TRAIL_LENGTH = 5 // Reduced for better performance (50% fewer draw calls)
 
 function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)

@@ -13,6 +13,8 @@ class AudioEngine {
   private waveformArray: Uint8Array = new Uint8Array(2048)
   private stream?: MediaStream
   private audioElement?: HTMLAudioElement
+  private mediaSource?: MediaElementAudioSourceNode
+  private blobURL?: string
   private rafId?: number
   private beatDetector: BeatDetector = new BeatDetector()
   private frame: AudioFrame = {
@@ -99,10 +101,25 @@ class AudioEngine {
     cancelAnimationFrame(this.rafId ?? 0)
     this.rafId = undefined
     this.analyser?.disconnect()
+    this.mediaSource?.disconnect()
     this.context?.close()
     this.stream?.getTracks().forEach((track) => track.stop())
+    
+    // Clean up audio file resources
+    if (this.audioElement) {
+      this.audioElement.pause()
+      this.audioElement.src = ''
+      this.audioElement = undefined
+    }
+    
+    if (this.blobURL) {
+      URL.revokeObjectURL(this.blobURL)
+      this.blobURL = undefined
+    }
+    
     this.context = undefined
     this.analyser = undefined
+    this.mediaSource = undefined
     this.stream = undefined
     this.dataArray = new Uint8Array(1024)
     this.waveformArray = new Uint8Array(2048)
@@ -167,22 +184,35 @@ class AudioEngine {
         this.stream = undefined
       }
 
+      // Clean up previous audio file resources
+      if (this.mediaSource) {
+        this.mediaSource.disconnect()
+        this.mediaSource = undefined
+      }
+
+      if (this.blobURL) {
+        URL.revokeObjectURL(this.blobURL)
+        this.blobURL = undefined
+      }
+
+      if (this.audioElement) {
+        this.audioElement.pause()
+        this.audioElement.src = ''
+        this.audioElement = undefined
+      }
+
       // Create or reuse audio context
       if (!this.context) {
         this.context = new AudioContext()
       }
 
-      // Create audio element
-      if (this.audioElement) {
-        this.audioElement.pause()
-        this.audioElement.src = ''
-      }
-      
+      // Create audio element with new blob URL
       this.audioElement = new Audio()
-      this.audioElement.src = URL.createObjectURL(file)
+      this.blobURL = URL.createObjectURL(file)
+      this.audioElement.src = this.blobURL
       this.audioElement.loop = true
 
-      // Create analyser
+      // Create analyser if needed
       if (!this.analyser) {
         this.analyser = this.context.createAnalyser()
         this.analyser.fftSize = 2048
@@ -192,8 +222,8 @@ class AudioEngine {
       }
 
       // Connect audio element to analyser
-      const source = this.context.createMediaElementSource(this.audioElement)
-      source.connect(this.analyser)
+      this.mediaSource = this.context.createMediaElementSource(this.audioElement)
+      this.mediaSource.connect(this.analyser)
       this.analyser.connect(this.context.destination)
 
       // Play audio
