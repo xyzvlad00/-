@@ -52,9 +52,12 @@ export function useCanvasLoop(canvasRef: RefObject<HTMLCanvasElement | null>, dr
       if (resizeTimeout) clearTimeout(resizeTimeout)
       resizeTimeout = setTimeout(resize, 100)
     })
+    
+    // Initial resize (immediate, no debounce)
+    resize()
+    
     resizeObserver.observe(canvas)
     window.addEventListener('resize', handleResize)
-    resize()
     raf = requestAnimationFrame(render)
 
     return () => {
