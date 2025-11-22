@@ -9,6 +9,7 @@ const HIGH_RANGE: [number, number] = [2000, 16000]
 class AudioEngine {
   private context?: AudioContext
   private analyser?: AnalyserNode
+  private gainNode?: GainNode
   private dataArray: Uint8Array = new Uint8Array(1024)
   private waveformArray: Uint8Array = new Uint8Array(2048)
   private stream?: MediaStream
@@ -17,6 +18,9 @@ class AudioEngine {
   private blobURL?: string
   private rafId?: number
   private beatDetector: BeatDetector = new BeatDetector()
+  private smoothedBass: number = 0
+  private smoothedMid: number = 0
+  private smoothedHigh: number = 0
   private frame: AudioFrame = {
     frequencyData: new Uint8Array(1024),
     waveformData: new Uint8Array(2048),
@@ -45,15 +49,30 @@ class AudioEngine {
 
     this.setStatus('requesting')
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      this.stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        }
+      })
       this.context = new AudioContext()
       const source = this.context.createMediaStreamSource(this.stream)
+      
+      // Create gain node for volume control
+      this.gainNode = this.context.createGain()
+      this.gainNode.gain.value = 1.0
+      
       this.analyser = this.context.createAnalyser()
       this.analyser.fftSize = 2048
-      this.analyser.smoothingTimeConstant = 0.8
+      this.analyser.smoothingTimeConstant = 0.75 // Slightly reduced for more responsiveness
+      this.analyser.minDecibels = -90
+      this.analyser.maxDecibels = -10
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
       this.waveformArray = new Uint8Array(this.analyser.fftSize)
-      source.connect(this.analyser)
+      
+      source.connect(this.gainNode)
+      this.gainNode.connect(this.analyser)
 
       if (this.context.state === 'suspended') {
         this.setStatus('suspended', 'Tap to activate the audio engine.')
@@ -165,12 +184,23 @@ class AudioEngine {
 
     const beatResult = this.beatDetector.detect(freqBuffer)
 
+    // Compute raw energies
+    const rawBass = computeBandEnergy(BASS_RANGE)
+    const rawMid = computeBandEnergy(MID_RANGE)
+    const rawHigh = computeBandEnergy(HIGH_RANGE)
+
+    // Apply smoothing for less jitter (exponential moving average)
+    const smoothingFactor = 0.25
+    this.smoothedBass += (rawBass - this.smoothedBass) * smoothingFactor
+    this.smoothedMid += (rawMid - this.smoothedMid) * smoothingFactor
+    this.smoothedHigh += (rawHigh - this.smoothedHigh) * smoothingFactor
+
     this.frame = {
       frequencyData: freqBuffer,
       waveformData: timeBuffer,
-      bassEnergy: computeBandEnergy(BASS_RANGE),
-      midEnergy: computeBandEnergy(MID_RANGE),
-      highEnergy: computeBandEnergy(HIGH_RANGE),
+      bassEnergy: this.smoothedBass,
+      midEnergy: this.smoothedMid,
+      highEnergy: this.smoothedHigh,
       overallVolume: Math.sqrt(rmsSum / this.waveformArray.length),
       beatInfo: beatResult,
     }
@@ -212,18 +242,26 @@ class AudioEngine {
       this.audioElement.src = this.blobURL
       this.audioElement.loop = true
 
-      // Create analyser if needed
+      // Create analyser and gain node if needed
       if (!this.analyser) {
         this.analyser = this.context.createAnalyser()
         this.analyser.fftSize = 2048
-        this.analyser.smoothingTimeConstant = 0.8
+        this.analyser.smoothingTimeConstant = 0.75
+        this.analyser.minDecibels = -90
+        this.analyser.maxDecibels = -10
         this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
         this.waveformArray = new Uint8Array(this.analyser.fftSize)
       }
 
-      // Connect audio element to analyser
+      if (!this.gainNode) {
+        this.gainNode = this.context.createGain()
+        this.gainNode.gain.value = 1.0
+      }
+
+      // Connect audio element to analyser with gain control
       this.mediaSource = this.context.createMediaElementSource(this.audioElement)
-      this.mediaSource.connect(this.analyser)
+      this.mediaSource.connect(this.gainNode)
+      this.gainNode.connect(this.analyser)
       this.analyser.connect(this.context.destination)
 
       // Play audio
@@ -247,6 +285,17 @@ class AudioEngine {
 
   getBPM(): number {
     return this.beatDetector.getBPM()
+  }
+
+  setGain(value: number) {
+    if (this.gainNode) {
+      // Clamp value between 0 and 3 for safety
+      this.gainNode.gain.value = Math.max(0, Math.min(3, value))
+    }
+  }
+
+  getGain(): number {
+    return this.gainNode?.gain.value ?? 1.0
   }
 
   private setStatus(status: AudioStatus, message?: string) {
