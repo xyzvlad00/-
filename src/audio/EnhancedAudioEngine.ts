@@ -83,24 +83,30 @@ class EnhancedAudioEngine {
   }
 
   async start() {
+    // If already initialized, just ensure it's running
     if (this.context || this.stream) {
       if (this.context?.state === 'suspended') {
         await this.context.resume()
+        this.setStatus('listening')
+      } else if (this.context?.state === 'running') {
+        this.setStatus('listening')
       }
-      this.setStatus('listening')
       if (!this.rafId) {
         this.loop()
       }
       return
     }
 
+    // Check browser support
     if (!navigator.mediaDevices?.getUserMedia) {
       this.setStatus('unsupported', 'Microphone access is not available in this browser.')
       return
     }
 
     this.setStatus('requesting')
+    
     try {
+      // Request microphone access
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
@@ -108,12 +114,16 @@ class EnhancedAudioEngine {
           autoGainControl: false,
         }
       })
+      
+      // Create audio context
       this.context = new AudioContext()
       const source = this.context.createMediaStreamSource(this.stream)
       
+      // Setup gain node
       this.gainNode = this.context.createGain()
       this.gainNode.gain.value = 2.2 // Increased for better sensitivity
       
+      // Setup analyser
       this.analyser = this.context.createAnalyser()
       this.analyser.fftSize = 2048
       this.analyser.smoothingTimeConstant = 0.7 // Slightly faster for transient detection
@@ -122,31 +132,45 @@ class EnhancedAudioEngine {
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
       this.waveformArray = new Uint8Array(this.analyser.fftSize)
       
+      // Connect audio graph
       source.connect(this.gainNode)
       this.gainNode.connect(this.analyser)
 
+      // Handle audio context state
       if (this.context.state === 'suspended') {
-        this.setStatus('suspended', 'Tap to activate the audio engine.')
+        this.setStatus('suspended', 'Tap anywhere to activate audio.')
+        console.log('[AudioEngine] Context suspended, waiting for user gesture')
       } else {
         this.setStatus('listening')
         this.loop()
         // Auto-calibrate after 2 seconds
         setTimeout(() => this.startCalibration(), 2000)
+        console.log('[AudioEngine] Started successfully')
       }
 
+      // Monitor state changes
       this.context.onstatechange = () => {
         if (!this.context) return
+        console.log('[AudioEngine] State changed to:', this.context.state)
+        
         if (this.context.state === 'running') {
           this.setStatus('listening')
           if (!this.rafId) {
             this.loop()
           }
+          // Start calibration if not already done
+          if (!this.calibration.isCalibrated && !this.isCalibrating) {
+            setTimeout(() => this.startCalibration(), 2000)
+          }
         } else if (this.context.state === 'suspended') {
-          this.setStatus('suspended', 'Audio context suspended. Tap to resume.')
+          this.setStatus('suspended', 'Tap anywhere to resume audio.')
         }
       }
+      
     } catch (error) {
       const err = error as DOMException
+      console.error('[AudioEngine] Error:', err)
+      
       if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
         this.setStatus('denied', 'Microphone permission is required to render visuals.')
       } else if (err.name === 'NotFoundError') {
@@ -158,14 +182,28 @@ class EnhancedAudioEngine {
   }
 
   async resume() {
+    console.log('[AudioEngine] Resume called, current state:', this.context?.state)
+    
     if (this.context && this.context.state === 'suspended') {
-      await this.context.resume()
+      try {
+        await this.context.resume()
+        this.setStatus('listening')
+        if (!this.rafId) {
+          this.loop()
+        }
+        console.log('[AudioEngine] Resumed successfully')
+      } catch (error) {
+        console.error('[AudioEngine] Resume failed:', error)
+        this.setStatus('error', 'Failed to resume audio context.')
+      }
+    } else if (!this.context) {
+      await this.start()
+    } else {
+      // Already running
       this.setStatus('listening')
       if (!this.rafId) {
         this.loop()
       }
-    } else if (!this.context) {
-      await this.start()
     }
   }
 

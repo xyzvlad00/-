@@ -38,6 +38,7 @@ function App() {
     // Only initialize after loading is complete
     if (!loadingComplete) return
 
+    // Start audio engine
     enhancedAudioEngine.start()
     performanceMonitor.start()
     
@@ -48,6 +49,11 @@ function App() {
       
       // Request wake lock to prevent screen dimming
       requestWakeLock().then(lock => setWakeLock(lock))
+    }
+    
+    // Global click handler to resume audio context (especially important for mobile)
+    const handleFirstInteraction = () => {
+      enhancedAudioEngine.resume()
     }
     
     // Toggle performance stats with Shift+P
@@ -64,12 +70,17 @@ function App() {
       }
     }
     
+    // Listen for any interaction to start audio
+    document.addEventListener('click', handleFirstInteraction, { once: true })
+    document.addEventListener('touchstart', handleFirstInteraction, { once: true })
     window.addEventListener('keydown', handleKeyPress)
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
       enhancedAudioEngine.stop()
       performanceMonitor.stop()
+      document.removeEventListener('click', handleFirstInteraction)
+      document.removeEventListener('touchstart', handleFirstInteraction)
       window.removeEventListener('keydown', handleKeyPress)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       
