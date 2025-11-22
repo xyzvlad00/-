@@ -1,46 +1,40 @@
 import { useMemo, useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, createLinearGradient, getThemePalette } from '../utils/colors'
-import { easeAudio, getFrequencyValue } from '../utils/audio'
 import { applyGlow, clearGlow } from '../utils/shapes'
-import { EASING_CURVES } from '../constants'
-
-const BAR_COUNT = 128
+import { mapFrequencyIndexToEnergy, mapEnergyToHueShift } from '../utils/visualMapping'
 
 function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('bars')
+  const audioConfig = useAudioMappingConfig('bars')
+  
+  const BAR_COUNT = qualityParams.segmentCount || 128
   const peakHoldRef = useRef<number[]>(new Array(BAR_COUNT).fill(0))
   const peakFallRef = useRef<number[]>(new Array(BAR_COUNT).fill(0))
   
   const colors = useMemo(() => getThemePalette(theme).primary, [theme])
 
-  useCanvasLoop(
+  // Update peak arrays if BAR_COUNT changes
+  if (peakHoldRef.current.length !== BAR_COUNT) {
+    peakHoldRef.current = new Array(BAR_COUNT).fill(0)
+    peakFallRef.current = new Array(BAR_COUNT).fill(0)
+  }
+
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
       ctx.fillStyle = theme === 'dark' ? 'rgba(5,6,10,0.25)' : 'rgba(250,250,255,0.3)'
       ctx.fillRect(0, 0, width, height)
 
-      const step = Math.max(1, Math.floor(frame.frequencyData.length / BAR_COUNT))
       const barWidth = width / BAR_COUNT
       const time = Date.now() * 0.001
-      
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
 
       for (let i = 0; i < BAR_COUNT; i++) {
-        const rawValue = getFrequencyValue(frame.frequencyData, i * step)
-        
-        // Enhanced audio reactivity with frequency-specific easing
-        let eased: number
-        if (i < BAR_COUNT * 0.25) {
-          eased = easeAudio(rawValue, 1.1) * sensitivity * (1 + bassEnergy * 0.5)
-        } else if (i < BAR_COUNT * 0.7) {
-          eased = easeAudio(rawValue, 1.3) * sensitivity * (1 + midEnergy * 0.3)
-        } else {
-          eased = easeAudio(rawValue, 1.5) * sensitivity * 1.1
-        }
+        // Use enhanced mapping with perceptual curve
+        const eased = mapFrequencyIndexToEnergy(frame, i, BAR_COUNT, sensitivity * (audioConfig.motionSensitivity || 1.0))
         
         const barHeight = Math.min(height * 0.92, eased * height * 1.4)
         const x = i * barWidth
@@ -57,9 +51,10 @@ function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
           }
         }
         
-        // Color calculation
+        // Color calculation with enhanced mapping
         const freqRatio = i / BAR_COUNT
-        const hueShift = freqRatio * 280 + time * 25 + eased * 30
+        const baseHue = freqRatio * 280 + time * 25
+        const hueShift = mapEnergyToHueShift(frame, baseHue, 30, audioConfig)
         
         // Bar gradient with enhanced colors
         const barGradient = createLinearGradient(ctx, x, y + barHeight, x, y, [
@@ -110,7 +105,7 @@ function BarsSpectrum({ sensitivity, theme }: VisualComponentProps) {
       ctx.drawImage(ctx.canvas, 0, 0)
       ctx.restore()
     },
-    [sensitivity, theme, colors],
+    [sensitivity, theme, colors, BAR_COUNT],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/10" />

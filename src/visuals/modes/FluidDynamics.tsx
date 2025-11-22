@@ -1,17 +1,17 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, hslToRgb, createRadialGradient } from '../utils/colors'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES, PERFORMANCE } from '../constants'
 
 function FluidDynamics({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('fluid')
+  const audioConfig = useAudioMappingConfig('fluid')
   const metaballsRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; radius: number; hue: number; energy: number }>>([])
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const offscreenCtxRef = useRef<CanvasRenderingContext2D | null>(null)
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -19,25 +19,13 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
       const centerX = width / 2
       const centerY = height / 2
 
-      const pixelCount = width * height
-      let renderScale = 0.5
-      let maxBalls = 28
+      // Use quality params for resolution and particle count
+      const targetResolution = qualityParams.resolution || 480
+      const maxBalls = qualityParams.particleCount || 8
+      const renderScale = Math.min(1.0, targetResolution / Math.max(width, height))
       
-      if (pixelCount > PERFORMANCE.FULLSCREEN_1080P) {
-        renderScale = 0.35
-        maxBalls = 16
-      }
-      if (pixelCount > PERFORMANCE.FULLSCREEN_1440P) {
-        renderScale = 0.28
-        maxBalls = 12
-      }
-      if (pixelCount > PERFORMANCE.FULLSCREEN_4K) {
-        renderScale = 0.22
-        maxBalls = 8
-      }
-      
-      const renderWidth = Math.floor(width * renderScale)
-      const renderHeight = Math.floor(height * renderScale)
+      const renderWidth = Math.max(120, Math.floor(width * renderScale))
+      const renderHeight = Math.max(120, Math.floor(height * renderScale))
 
       if (!offscreenCanvasRef.current || 
           offscreenCanvasRef.current.width !== renderWidth || 
@@ -54,10 +42,10 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = 'rgba(0, 0, 8, 0.1)'
       ctx.fillRect(0, 0, width, height)
 
-      // Reduced sensitivity multipliers
-      const bassForce = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity * 0.6
-      const midFlow = easeAudio(frame.midEnergy, 0.85) * sensitivity * 0.65
-      const highSpark = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity * 0.7
+      // Use normalized energies with audio config weights
+      const bassForce = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0) * 0.6
+      const midFlow = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0) * 0.65
+      const highSpark = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0) * 0.7
 
       if (metaballsRef.current.length < maxBalls && (frame.overallVolume > 0.3 || metaballsRef.current.length < maxBalls * 0.5)) {
         if (Math.random() > 0.88 || metaballsRef.current.length < 5) {
@@ -76,9 +64,17 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
       }
 
       metaballsRef.current.forEach((ball, i) => {
-        const freqIndex = Math.floor((i / metaballsRef.current.length) * frame.frequencyData.length * 0.75)
-        const magnitude = frame.frequencyData[freqIndex] / 255
-        const smoothEnergy = ball.energy * 0.8 + magnitude * sensitivity * 0.2
+        // More dynamic frequency mapping - each ball responds to different frequency range
+        const freqStart = Math.floor((i / metaballsRef.current.length) * frame.frequencyData.length * 0.8)
+        const freqEnd = Math.min(freqStart + 8, frame.frequencyData.length)
+        let magnitudeSum = 0
+        for (let f = freqStart; f < freqEnd; f++) {
+          magnitudeSum += frame.frequencyData[f] / 255
+        }
+        const magnitude = magnitudeSum / (freqEnd - freqStart)
+        
+        // Faster energy response for more dynamic visuals
+        const smoothEnergy = ball.energy * 0.7 + magnitude * sensitivity * 0.3
         ball.energy = smoothEnergy
 
         const dx = centerX - ball.x
@@ -86,28 +82,33 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
         const distSq = dx * dx + dy * dy
         const dist = Math.sqrt(distSq)
 
+        // Dynamic attraction/repulsion based on frequency
         if (dist > 1) {
-          const attraction = bassForce * 0.4 * (1 - ball.energy * 0.2)
+          const attraction = (magnitude > 0.5 ? -0.8 : 0.6) * bassForce * (1 + ball.energy * 0.5)
           ball.vx += (dx / dist) * attraction
           ball.vy += (dy / dist) * attraction
         }
 
+        // More dynamic vortex
         const angle = Math.atan2(dy, dx)
-        const vortexStrength = midFlow * 1.5 * (1 + ball.energy * 0.3)
-        ball.vx += Math.cos(angle + Math.PI / 2) * vortexStrength
-        ball.vy += Math.sin(angle + Math.PI / 2) * vortexStrength
+        const vortexStrength = midFlow * 2.0 * (1 + ball.energy * 0.5)
+        const vortexDirection = magnitude > 0.5 ? -1 : 1
+        ball.vx += Math.cos(angle + Math.PI / 2 * vortexDirection) * vortexStrength
+        ball.vy += Math.sin(angle + Math.PI / 2 * vortexDirection) * vortexStrength
 
-        if (highSpark > 0.4) {
-          ball.vx += (Math.random() - 0.5) * highSpark * 2
-          ball.vy += (Math.random() - 0.5) * highSpark * 2
+        // More dramatic high frequency response
+        if (highSpark > 0.3) {
+          ball.vx += (Math.random() - 0.5) * highSpark * 3
+          ball.vy += (Math.random() - 0.5) * highSpark * 3
         }
 
         ball.x += ball.vx
         ball.y += ball.vy
-        ball.vx *= 0.97
-        ball.vy *= 0.97
+        ball.vx *= 0.96
+        ball.vy *= 0.96
 
-        ball.radius = 40 + ball.energy * 70 + bassForce * 12
+        // More dramatic size variation
+        ball.radius = 35 + ball.energy * 80 + bassForce * 18 + magnitude * 25
 
         const margin = ball.radius * 1.5
         if (ball.x < -margin) ball.x = width + margin
@@ -115,7 +116,8 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
         if (ball.y < -margin) ball.y = height + margin
         if (ball.y > height + margin) ball.y = -margin
         
-        ball.hue = (ball.hue + midFlow * 1.2 + ball.energy * 0.25) % 360
+        // More dynamic color changes
+        ball.hue = (ball.hue + midFlow * 2.0 + ball.energy * 0.8 + magnitude * 1.5) % 360
       })
 
       const imageData = offscreenCtxRef.current!.createImageData(renderWidth, renderHeight)
@@ -220,7 +222,7 @@ function FluidDynamics({ sensitivity }: VisualComponentProps) {
         metaballsRef.current = metaballsRef.current.slice(-maxBalls)
       }
     },
-    [sensitivity],
+    [sensitivity, qualityParams.resolution, qualityParams.particleCount],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />

@@ -1,285 +1,211 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
-import { hsl, createRadialGradient } from '../utils/colors'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES } from '../constants'
+import { hsl } from '../utils/colors'
 
-interface Neuron {
-  x: number
-  y: number
-  z: number
-  vx: number
-  vy: number
-  vz: number
-  activation: number
-  targetActivation: number
-  connections: number[]
-  layer: number
+interface FlowLine {
+  startX: number
+  startY: number
+  angle: number
+  speed: number
+  progress: number
+  hue: number
+  amplitude: number
+  frequency: number
+  thickness: number
 }
 
+// Minimalistic flowing lines visualization
 function NeuralNetwork({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const neuronsRef = useRef<Neuron[]>([])
+  const qualityParams = useQualityParams('neural')
+  const audioConfig = useAudioMappingConfig('neural')
+  const linesRef = useRef<FlowLine[]>([])
   const timeRef = useRef(0)
-  const pulseRef = useRef<Array<{ from: number; to: number; progress: number; speed: number; color: number }>>([])
+  
+  const MAX_LINES = qualityParams.particleCount || 60
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
       timeRef.current += 0.016
 
-      // Clear with trail effect
-      ctx.fillStyle = theme === 'dark' ? 'rgba(0, 2, 8, 0.12)' : 'rgba(240, 240, 250, 0.12)'
+      // Clean fade background
+      ctx.fillStyle = theme === 'dark' ? 'rgba(2, 4, 10, 0.08)' : 'rgba(245, 247, 252, 0.08)'
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energies
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
-      // Initialize neurons in 3D space with layers
-      if (neuronsRef.current.length === 0) {
-        const layers = 6
-        const neuronsPerLayer = [8, 16, 24, 24, 16, 8] // Hourglass shape
-        let id = 0
+      // Create new flowing lines based on audio
+      if (linesRef.current.length < MAX_LINES && Math.random() < 0.15 + highEnergy * 0.25) {
+        // Diagonal angles for interesting perspective
+        const angles = [-0.8, -0.4, 0, 0.4, 0.8, 1.2] // Various angles in radians
+        const angle = angles[Math.floor(Math.random() * angles.length)]
+        
+        // Start from edges
+        let startX, startY
+        if (Math.abs(angle) < 0.5) {
+          // Horizontal-ish: start from left or right
+          startX = Math.random() > 0.5 ? -50 : width + 50
+          startY = Math.random() * height
+        } else {
+          // Diagonal: start from corners/edges
+          startX = Math.random() * width
+          startY = Math.random() > 0.5 ? -50 : height + 50
+        }
+        
+        linesRef.current.push({
+          startX,
+          startY,
+          angle,
+          speed: 2 + Math.random() * 3 + midEnergy * 4,
+          progress: 0,
+          hue: 180 + Math.random() * 120 + bassEnergy * 80,
+          amplitude: 20 + Math.random() * 40 + bassEnergy * 30,
+          frequency: 0.01 + Math.random() * 0.02,
+          thickness: 0.5 + Math.random() * 1.5 + frame.overallVolumeNorm * 2,
+        })
+      }
 
-        for (let layer = 0; layer < layers; layer++) {
-          const count = neuronsPerLayer[layer]
-          const layerZ = (layer / (layers - 1)) * 800 - 400 // -400 to +400
-          
-          for (let i = 0; i < count; i++) {
-            const angle = (i / count) * Math.PI * 2
-            const radius = 150 + Math.random() * 100
-            
-            neuronsRef.current.push({
-              x: Math.cos(angle) * radius + (Math.random() - 0.5) * 100,
-              y: Math.sin(angle) * radius + (Math.random() - 0.5) * 100,
-              z: layerZ + (Math.random() - 0.5) * 100,
-              vx: (Math.random() - 0.5) * 0.5,
-              vy: (Math.random() - 0.5) * 0.5,
-              vz: (Math.random() - 0.5) * 0.5,
-              activation: Math.random(),
-              targetActivation: 0,
-              connections: [],
-              layer: layer,
-            })
-            id++
-          }
+      // Update and draw lines
+      linesRef.current = linesRef.current.filter((line) => {
+        line.progress += line.speed
+        
+        // Check if line is off screen
+        const currentX = line.startX + Math.cos(line.angle) * line.progress
+        const currentY = line.startY + Math.sin(line.angle) * line.progress
+        
+        if (currentX < -100 || currentX > width + 100 || currentY < -100 || currentY > height + 100) {
+          return false
         }
 
-        // Create connections between adjacent layers and some within layers
-        neuronsRef.current.forEach((neuron, i) => {
-          neuronsRef.current.forEach((other, j) => {
-            if (i !== j) {
-              const layerDiff = Math.abs(neuron.layer - other.layer)
-              const dx = neuron.x - other.x
-              const dy = neuron.y - other.y
-              const dz = neuron.z - other.z
-              const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+        // Draw flowing curved line
+        const points: Array<{ x: number; y: number }> = []
+        const segments = 50
+        const lineLength = 180 + line.amplitude * 2
+        
+        for (let i = 0; i < segments; i++) {
+          const t = i / segments
+          const distance = line.progress + t * lineLength
+          
+          // Base position along angle
+          const baseX = line.startX + Math.cos(line.angle) * distance
+          const baseY = line.startY + Math.sin(line.angle) * distance
+          
+          // Wave offset perpendicular to direction
+          const waveOffset = Math.sin(distance * line.frequency + timeRef.current * 2) * line.amplitude
+          const perpAngle = line.angle + Math.PI / 2
+          
+          points.push({
+            x: baseX + Math.cos(perpAngle) * waveOffset,
+            y: baseY + Math.sin(perpAngle) * waveOffset,
+          })
+        }
+
+        // Draw line with gradient
+        if (points.length > 1) {
+          // Fade based on lifecycle
+          const lifeFade = Math.min(1, line.progress / 100) * Math.max(0, 1 - line.progress / 600)
+          
+          ctx.beginPath()
+          ctx.moveTo(points[0].x, points[0].y)
+          
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y)
+          }
+          
+          // Thin, elegant lines
+          const alpha = lifeFade * 0.6
+          ctx.strokeStyle = hsl(line.hue, 80, 55, alpha)
+          ctx.lineWidth = line.thickness
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.stroke()
+          
+          // Highlight glow for high-energy segments
+          if (frame.overallVolumeNorm > 0.5) {
+            ctx.strokeStyle = hsl(line.hue + 30, 90, 65, alpha * 0.4)
+            ctx.lineWidth = line.thickness * 1.5
+            ctx.shadowBlur = 8 + frame.overallVolumeNorm * 12
+            ctx.shadowColor = hsl(line.hue, 100, 60, alpha * 0.5)
+            ctx.stroke()
+            ctx.shadowBlur = 0
+          }
+          
+          // Draw energy nodes at intervals
+          for (let i = 0; i < points.length; i += 10) {
+            if (Math.random() < 0.3 + highEnergy * 0.4) {
+              const point = points[i]
+              const nodeSize = 1 + line.thickness * 0.8 + highEnergy * 3
               
-              // Connect to adjacent layers or nearby neurons
-              if ((layerDiff === 1 && Math.random() > 0.3) || (layerDiff === 0 && dist < 200 && Math.random() > 0.7)) {
-                neuron.connections.push(j)
+              ctx.fillStyle = hsl(line.hue, 90, 70, lifeFade * 0.8)
+              ctx.beginPath()
+              ctx.arc(point.x, point.y, nodeSize, 0, Math.PI * 2)
+              ctx.fill()
+              
+              // Bright core
+              if (highEnergy > 0.5) {
+                ctx.fillStyle = hsl(line.hue, 100, 85, lifeFade)
+                ctx.beginPath()
+                ctx.arc(point.x, point.y, nodeSize * 0.4, 0, Math.PI * 2)
+                ctx.fill()
               }
             }
-          })
-        })
-      }
-
-      // Update neuron activations based on audio
-      const neurons = neuronsRef.current
-      neurons.forEach((neuron, i) => {
-        const freqIndex = Math.floor((i / neurons.length) * frame.frequencyData.length)
-        const audioValue = frame.frequencyData[freqIndex] / 255
-        
-        // Different layers respond to different frequencies
-        let energyBoost = 0
-        if (neuron.layer < 2) energyBoost = bassEnergy * 1.5
-        else if (neuron.layer < 4) energyBoost = midEnergy * 1.2
-        else energyBoost = highEnergy * 1.0
-        
-        neuron.targetActivation = audioValue * 0.7 + energyBoost * 0.3
-        neuron.activation += (neuron.targetActivation - neuron.activation) * 0.1
-
-        // Add motion to neurons
-        neuron.vx += (Math.random() - 0.5) * 0.2
-        neuron.vy += (Math.random() - 0.5) * 0.2
-        neuron.vz += (Math.random() - 0.5) * 0.2
-        neuron.vx *= 0.95
-        neuron.vy *= 0.95
-        neuron.vz *= 0.95
-
-        neuron.x += neuron.vx + Math.sin(timeRef.current * 0.5 + i) * (bassEnergy * 2)
-        neuron.y += neuron.vy + Math.cos(timeRef.current * 0.5 + i) * (bassEnergy * 2)
-        neuron.z += neuron.vz + Math.sin(timeRef.current * 0.3 + i * 0.1) * (midEnergy * 3)
-
-        // Keep neurons loosely bounded
-        const centerPull = 0.003
-        neuron.vx -= neuron.x * centerPull
-        neuron.vy -= neuron.y * centerPull
-        neuron.vz -= neuron.z * centerPull
-      })
-
-      // Create new pulses
-      if (Math.random() < 0.1 + highEnergy * 0.3) {
-        const fromIdx = Math.floor(Math.random() * neurons.length)
-        const fromNeuron = neurons[fromIdx]
-        if (fromNeuron.connections.length > 0) {
-          const toIdx = fromNeuron.connections[Math.floor(Math.random() * fromNeuron.connections.length)]
-          pulseRef.current.push({
-            from: fromIdx,
-            to: toIdx,
-            progress: 0,
-            speed: 0.02 + highEnergy * 0.03,
-            color: Math.random() * 360,
-          })
+          }
         }
-      }
-
-      // Camera/projection setup
-      const fov = 800
-      const cameraZ = -600 - Math.sin(timeRef.current * 0.3) * 200
-      const cameraRotation = timeRef.current * 0.2
-
-      // Project and sort neurons by depth
-      const projected = neurons.map((neuron, i) => {
-        // Rotate around Y axis
-        const rotX = neuron.x * Math.cos(cameraRotation) - neuron.z * Math.sin(cameraRotation)
-        const rotZ = neuron.x * Math.sin(cameraRotation) + neuron.z * Math.cos(cameraRotation)
-        
-        const z = rotZ - cameraZ
-        const scale = fov / (fov + z)
-        const x2d = rotX * scale + width / 2
-        const y2d = neuron.y * scale + height / 2
-        
-        return { neuron, i, x2d, y2d, z, scale, rotX, rotZ }
-      })
-
-      projected.sort((a, b) => a.z - b.z)
-
-      // Draw connections first (behind neurons)
-      ctx.globalCompositeOperation = 'lighter'
-      projected.forEach(({ neuron, x2d, y2d, z, scale }) => {
-        neuron.connections.forEach((connIdx) => {
-          const otherProj = projected.find(p => p.i === connIdx)
-          if (!otherProj) return
-
-          const dist = Math.sqrt(
-            Math.pow(x2d - otherProj.x2d, 2) + 
-            Math.pow(y2d - otherProj.y2d, 2)
-          )
-          
-          if (dist > 500) return // Don't draw very long connections
-
-          const avgActivation = (neuron.activation + otherProj.neuron.activation) / 2
-          const avgZ = (z + otherProj.z) / 2
-          const depthOpacity = Math.max(0, 1 - avgZ / 1000)
-          
-          const gradient = ctx.createLinearGradient(x2d, y2d, otherProj.x2d, otherProj.y2d)
-          const hue1 = (neuron.layer * 60) % 360
-          const hue2 = (otherProj.neuron.layer * 60) % 360
-          
-          gradient.addColorStop(0, hsl(hue1, 80, 50 + avgActivation * 30, avgActivation * 0.3 * depthOpacity))
-          gradient.addColorStop(0.5, hsl((hue1 + hue2) / 2, 85, 55 + avgActivation * 35, avgActivation * 0.5 * depthOpacity))
-          gradient.addColorStop(1, hsl(hue2, 80, 50 + avgActivation * 30, avgActivation * 0.3 * depthOpacity))
-          
-          ctx.strokeStyle = gradient
-          ctx.lineWidth = (1 + avgActivation * 3) * scale
-            ctx.beginPath()
-          ctx.moveTo(x2d, y2d)
-          ctx.lineTo(otherProj.x2d, otherProj.y2d)
-            ctx.stroke()
-        })
-      })
-
-      // Draw pulses traveling along connections
-      pulseRef.current = pulseRef.current.filter((pulse) => {
-        pulse.progress += pulse.speed
-        if (pulse.progress > 1) return false
-
-        const fromProj = projected.find(p => p.i === pulse.from)
-        const toProj = projected.find(p => p.i === pulse.to)
-        if (!fromProj || !toProj) return false
-
-        const pulseX = fromProj.x2d + (toProj.x2d - fromProj.x2d) * pulse.progress
-        const pulseY = fromProj.y2d + (toProj.y2d - fromProj.y2d) * pulse.progress
-        const pulseZ = fromProj.z + (toProj.z - fromProj.z) * pulse.progress
-        const pulseScale = fov / (fov + pulseZ)
-        const depthOpacity = Math.max(0, 1 - pulseZ / 1000)
-
-        const size = (8 + Math.sin(pulse.progress * Math.PI) * 12) * pulseScale
-
-        const pulseGrad = createRadialGradient(ctx, pulseX, pulseY, 0, size * 2, [
-          { offset: 0, color: hsl(pulse.color, 100, 85, 0.9 * depthOpacity) },
-          { offset: 0.5, color: hsl(pulse.color + 30, 95, 75, 0.6 * depthOpacity) },
-          { offset: 1, color: hsl(pulse.color + 60, 90, 65, 0) },
-        ])
-        
-        ctx.fillStyle = pulseGrad
-        ctx.beginPath()
-        ctx.arc(pulseX, pulseY, size * 2, 0, Math.PI * 2)
-        ctx.fill()
 
         return true
       })
 
-      // Draw neurons on top
-      projected.forEach(({ neuron, x2d, y2d, z, scale }) => {
-        const depthOpacity = Math.max(0, 1 - z / 1000)
-        const size = (6 + neuron.activation * 18) * scale
-        const hue = (neuron.layer * 60 + timeRef.current * 20) % 360
-
-        // Glow
-        const glowGrad = createRadialGradient(ctx, x2d, y2d, 0, size * 3, [
-          { offset: 0, color: hsl(hue, 100, 75, (0.6 + neuron.activation * 0.4) * depthOpacity) },
-          { offset: 0.4, color: hsl(hue, 95, 65, (0.4 + neuron.activation * 0.4) * depthOpacity) },
-          { offset: 1, color: hsl(hue, 90, 55, 0) },
-        ])
-        ctx.fillStyle = glowGrad
-        ctx.beginPath()
-        ctx.arc(x2d, y2d, size * 3, 0, Math.PI * 2)
-        ctx.fill()
-
-        // Core
-        const coreGrad = createRadialGradient(ctx, x2d, y2d, 0, size, [
-          { offset: 0, color: hsl(hue, 100, 95, depthOpacity) },
-          { offset: 0.6, color: hsl(hue, 95, 75 + neuron.activation * 20, (0.9 + neuron.activation * 0.1) * depthOpacity) },
-          { offset: 1, color: hsl(hue, 90, 60 + neuron.activation * 25, (0.7 + neuron.activation * 0.3) * depthOpacity) },
-        ])
-        ctx.fillStyle = coreGrad
+      // Connection sparks between nearby lines
+      if (linesRef.current.length > 2 && Math.random() < 0.05 + highEnergy * 0.15) {
+        for (let i = 0; i < Math.min(3, linesRef.current.length - 1); i++) {
+          const line1 = linesRef.current[Math.floor(Math.random() * linesRef.current.length)]
+          const line2 = linesRef.current[Math.floor(Math.random() * linesRef.current.length)]
+          
+          if (line1 === line2) continue
+          
+          const x1 = line1.startX + Math.cos(line1.angle) * line1.progress
+          const y1 = line1.startY + Math.sin(line1.angle) * line1.progress
+          const x2 = line2.startX + Math.cos(line2.angle) * line2.progress
+          const y2 = line2.startY + Math.sin(line2.angle) * line2.progress
+          
+          const distance = Math.hypot(x2 - x1, y2 - y1)
+          
+          if (distance < 150 && distance > 0) {
+            ctx.strokeStyle = hsl((line1.hue + line2.hue) / 2, 85, 60, 0.2 * (1 - distance / 150))
+            ctx.lineWidth = 0.5
+            ctx.setLineDash([2, 4])
             ctx.beginPath()
-        ctx.arc(x2d, y2d, size, 0, Math.PI * 2)
-            ctx.fill()
-
-        // Extra bright center for highly activated neurons
-        if (neuron.activation > 0.7) {
-          ctx.fillStyle = hsl(hue, 100, 99, depthOpacity)
-          ctx.beginPath()
-          ctx.arc(x2d, y2d, size * 0.4, 0, Math.PI * 2)
-          ctx.fill()
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x2, y2)
+            ctx.stroke()
+            ctx.setLineDash([])
+          }
         }
-      })
+      }
 
-      ctx.globalCompositeOperation = 'source-over'
-
-      // Info overlay
-      ctx.shadowBlur = 0
-      ctx.fillStyle = theme === 'dark' ? 'rgba(100, 200, 255, 0.9)' : 'rgba(0, 50, 100, 0.9)'
-      ctx.font = 'bold 18px monospace'
-      ctx.textAlign = 'left'
-      
-      const avgActivation = neurons.reduce((sum, n) => sum + n.activation, 0) / neurons.length
-      const activeCount = neurons.filter(n => n.activation > 0.5).length
-      
-      ctx.fillText(`⚡ ${neurons.length} neurons`, 20, 30)
-      ctx.fillText(`🔥 ${activeCount} active`, 20, 55)
-      ctx.fillText(`📊 ${(avgActivation * 100).toFixed(0)}% avg`, 20, 80)
+      // Subtle ambient particles
+      if (Math.random() < 0.3 + midEnergy * 0.4) {
+        const x = Math.random() * width
+        const y = Math.random() * height
+        const size = 1 + Math.random() * 2
+        const hue = 200 + Math.random() * 100
+        
+        ctx.fillStyle = hsl(hue, 70, 60, 0.3)
+        ctx.beginPath()
+        ctx.arc(x, y, size, 0, Math.PI * 2)
+        ctx.fill()
+      }
     },
-    [sensitivity, theme],
+    [sensitivity, theme, MAX_LINES],
   )
 
-  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />
+  return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/40" />
 }
 
 export default NeuralNetwork

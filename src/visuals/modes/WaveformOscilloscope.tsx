@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 
 function WaveformOscilloscope({ sensitivity, theme }: VisualComponentProps) {
@@ -9,7 +9,7 @@ function WaveformOscilloscope({ sensitivity, theme }: VisualComponentProps) {
     [theme],
   )
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims

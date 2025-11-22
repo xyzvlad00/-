@@ -2,7 +2,6 @@ import { useState, useEffect, Suspense } from 'react'
 import clsx from 'clsx'
 import { getVisualById, visualRegistry } from '../visuals/registry'
 import { useAppStore } from '../state/useAppStore'
-import { useAudioActivity } from '../audio/useAudioActivity'
 import { ErrorBoundary } from './ErrorBoundary'
 import { VisualLoader } from './VisualLoader'
 
@@ -11,12 +10,10 @@ export function VisualHost() {
   const sensitivity = useAppStore((state) => state.sensitivity)
   const smoothMotion = useAppStore((state) => state.smoothMotion)
   const theme = useAppStore((state) => state.theme)
-  const status = useAppStore((state) => state.audioStatus)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showUI, setShowUI] = useState(true)
   
   const VisualComponent = getVisualById(visualMode).Component
-  const activity = useAudioActivity()
 
   const isDark = theme === 'dark'
 
@@ -91,11 +88,6 @@ export function VisualHost() {
           {isFullscreen ? '⊗ Exit' : '⛶ Fullscreen'}
         </button>
       </div>
-      {status === 'listening' && activity < 0.02 && (
-        <p className={clsx('mt-3 text-center text-sm', isDark ? 'text-white/60' : 'text-slate-600')}>
-          Try playing music or making some noise to wake the visuals.
-        </p>
-      )}
     </>
   )
 }

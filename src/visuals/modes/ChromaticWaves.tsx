@@ -1,22 +1,29 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 
 function ChromaticWaves({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const audioConfig = useAudioMappingConfig('chromatic')
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
       const time = Date.now() * 0.001
 
-      ctx.fillStyle = 'rgba(0, 0, 10, 0.15)'
+      // Stylish dark background with subtle gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, height)
+      bgGrad.addColorStop(0, 'rgba(5, 0, 15, 0.2)')
+      bgGrad.addColorStop(0.5, 'rgba(0, 5, 20, 0.2)')
+      bgGrad.addColorStop(1, 'rgba(10, 0, 10, 0.2)')
+      ctx.fillStyle = bgGrad
       ctx.fillRect(0, 0, width, height)
 
-      const bassOffset = Math.pow(frame.bassEnergy, 0.8) * sensitivity * 60
-      const midFreq = Math.pow(frame.midEnergy, 0.9) * sensitivity * 2
-      const highAberration = Math.pow(frame.highEnergy, 1) * sensitivity * 20
+      // Use normalized energies with config weights
+      const bassOffset = Math.pow(frame.bassEnergyNorm * (audioConfig.bassWeight || 1.0), 0.8) * sensitivity * 60
+      const midFreq = Math.pow(frame.midEnergyNorm * (audioConfig.midWeight || 1.0), 0.9) * sensitivity * 2
+      const highAberration = Math.pow(frame.highEnergyNorm * (audioConfig.highWeight || 1.0), 1) * sensitivity * 20
 
       const waveCount = 12
       for (let w = 0; w < waveCount; w++) {
@@ -30,24 +37,23 @@ function ChromaticWaves({ sensitivity }: VisualComponentProps) {
         const frequency = 0.004 + midFreq * 0.004
         const phase = time * 0.8 + waveProgress * 0.5 + bassOffset * 0.15
 
-        const hueShift = (waveProgress * 300 + time * 40) % 360
-
+        // More dramatic chromatic separation with RGB split
         const channels = [
-          { offset: -highAberration, hue: hueShift, alpha: 0.5 + magnitude * 0.4 },
-          { offset: 0, hue: hueShift + 120, alpha: 0.6 + magnitude * 0.3 },
-          { offset: highAberration, hue: hueShift + 240, alpha: 0.5 + magnitude * 0.4 },
+          { offset: -highAberration * 1.5, hue: 350, saturation: 100, lightness: 60, alpha: 0.7 + magnitude * 0.3, name: 'red' },
+          { offset: 0, hue: 180, saturation: 100, lightness: 65, alpha: 0.8 + magnitude * 0.2, name: 'cyan' },
+          { offset: highAberration * 1.5, hue: 280, saturation: 100, lightness: 60, alpha: 0.7 + magnitude * 0.3, name: 'magenta' },
         ]
 
         channels.forEach((channel) => {
           ctx.beginPath()
-          ctx.lineWidth = 2 + easedMag * 4
+          ctx.lineWidth = 2.5 + easedMag * 5
           ctx.lineCap = 'round'
           ctx.lineJoin = 'round'
 
           const gradient = ctx.createLinearGradient(0, 0, width, 0)
-          gradient.addColorStop(0, `hsla(${channel.hue}, 90%, 55%, ${channel.alpha})`)
-          gradient.addColorStop(0.5, `hsla(${channel.hue + 30}, 95%, 65%, ${channel.alpha * 1.1})`)
-          gradient.addColorStop(1, `hsla(${channel.hue + 60}, 90%, 55%, ${channel.alpha})`)
+          gradient.addColorStop(0, `hsla(${channel.hue}, ${channel.saturation}%, ${channel.lightness}%, ${channel.alpha})`)
+          gradient.addColorStop(0.5, `hsla(${channel.hue + 20}, ${channel.saturation}%, ${channel.lightness + 10}%, ${channel.alpha * 1.2})`)
+          gradient.addColorStop(1, `hsla(${channel.hue + 40}, ${channel.saturation}%, ${channel.lightness}%, ${channel.alpha})`)
 
           ctx.strokeStyle = gradient
 
@@ -62,11 +68,24 @@ function ChromaticWaves({ sensitivity }: VisualComponentProps) {
 
           ctx.stroke()
 
-          if (magnitude > 0.65) {
-            ctx.shadowBlur = 12 + magnitude * 20
-            ctx.shadowColor = `hsla(${channel.hue}, 100%, 70%, ${magnitude * 0.6})`
+          // Enhanced glow for all waves
+          if (magnitude > 0.4) {
+            ctx.shadowBlur = 15 + magnitude * 25
+            ctx.shadowColor = `hsla(${channel.hue}, 100%, 75%, ${magnitude * 0.8})`
+            ctx.lineWidth = 1.5 + easedMag * 3
             ctx.stroke()
             ctx.shadowBlur = 0
+          }
+          
+          // Extra chromatic bloom on high energy
+          if (magnitude > 0.7) {
+            ctx.globalCompositeOperation = 'lighter'
+            ctx.strokeStyle = `hsla(${channel.hue}, 100%, 80%, ${magnitude * 0.4})`
+            ctx.lineWidth = 3 + easedMag * 4
+            ctx.shadowBlur = 20 + magnitude * 30
+            ctx.stroke()
+            ctx.shadowBlur = 0
+            ctx.globalCompositeOperation = 'source-over'
           }
         })
       }

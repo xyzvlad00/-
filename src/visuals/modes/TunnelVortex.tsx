@@ -1,8 +1,6 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES } from '../constants'
 
 // Optimized tunnel with efficient rendering
 interface TunnelRing {
@@ -25,10 +23,15 @@ const MAX_PARTICLES = 150
 
 function TunnelVortex({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('tunnel')
+  const audioConfig = useAudioMappingConfig('tunnel')
   const ringsRef = useRef<TunnelRing[]>([])
   const particlesRef = useRef<StreamParticle[]>([])
+  
+  const SEGMENTS = qualityParams.segmentCount || 80
+  const ITERATIONS = qualityParams.iterationCount || 25
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -41,9 +44,10 @@ function TunnelVortex({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = 'rgba(0, 0, 12, 0.2)'
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, 0.78) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energy
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
       const zoomSpeed = 0.7 + frame.overallVolume * sensitivity * 2
 
@@ -228,7 +232,7 @@ function TunnelVortex({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = vignette
       ctx.fillRect(0, 0, width, height)
     },
-    [sensitivity],
+    [sensitivity, SEGMENTS, ITERATIONS],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />

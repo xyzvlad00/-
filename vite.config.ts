@@ -21,8 +21,8 @@ export default defineConfig({
     },
     // Enable source maps for better debugging
     sourcemap: true,
-    // Set chunk size warning limit (main bundle is 237KB minified, 74KB gzipped - acceptable for visual app)
-    chunkSizeWarningLimit: 250,
+    // Set chunk size warning limit (main bundle ~252KB with enhanced audio system - acceptable for visual app)
+    chunkSizeWarningLimit: 275,
   },
   // Optimize dependencies
   optimizeDeps: {

@@ -1,14 +1,14 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
-import type { AudioFrame } from '../../state/types'
+import type { EnhancedAudioFrame } from '../../audio/types'
 
 const SEGMENTS = 8
 
 // Shape definitions for morphing
 interface ShapeDefinition {
   name: string
-  render: (ctx: CanvasRenderingContext2D, radius: number, frame: AudioFrame, sensitivity: number, seed: number) => void
+  render: (ctx: CanvasRenderingContext2D, radius: number, frame: EnhancedAudioFrame, sensitivity: number, seed: number) => void
 }
 
 const SHAPES: ShapeDefinition[] = [
@@ -212,7 +212,7 @@ function KaleidoscopeMirror({ sensitivity }: VisualComponentProps) {
   const shapeTimerRef = useRef(0)
   const nextShapeTimeRef = useRef(8 + Math.random() * 12) // 8-20 seconds
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame, time) => {
       const { width, height } = dims
@@ -249,7 +249,7 @@ function KaleidoscopeMirror({ sensitivity }: VisualComponentProps) {
 
       ctx.restore()
     },
-    [sensitivity],
+    [sensitivity, SEGMENTS],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/20" />

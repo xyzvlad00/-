@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import clsx from 'clsx'
-import { audioEngine } from '../audio/AudioEngine'
+import { enhancedAudioEngine } from '../audio/EnhancedAudioEngine'
 import { useAppStore } from '../state/useAppStore'
 
 export function PermissionOverlay() {
@@ -35,8 +35,8 @@ export function PermissionOverlay() {
   const isBlocking = ['denied', 'error', 'unsupported'].includes(audioStatus)
   const primaryAction =
     audioStatus === 'suspended'
-      ? { label: 'Tap to start', handler: () => audioEngine.resume() }
-      : { label: 'Retry microphone access', handler: () => audioEngine.start() }
+      ? { label: 'Tap to start', handler: () => enhancedAudioEngine.resume() }
+      : { label: 'Retry microphone access', handler: () => enhancedAudioEngine.start() }
 
   const isDark = theme === 'dark'
 

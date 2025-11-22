@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import clsx from 'clsx'
 import { useAppStore } from '../state/useAppStore'
-import { audioEngine } from '../audio/AudioEngine'
+import { enhancedAudioEngine } from '../audio/EnhancedAudioEngine'
 
 const STATUS_COPY: Record<string, { label: string; toneDark: string; toneLight: string }> = {
   idle: { label: 'Idle', toneDark: 'border-white/10 text-white/60', toneLight: 'border-slate-300 text-slate-600' },
@@ -49,7 +49,7 @@ export function HeaderBar() {
         {audioStatus === 'suspended' && (
           <button
             type="button"
-            onClick={() => audioEngine.resume()}
+            onClick={() => enhancedAudioEngine.resume()}
             className={clsx(
               'rounded-2xl border border-aurora-500/40 bg-aurora-500/20 px-4 py-2 text-sm shadow-glow transition-all duration-300 hover:scale-110 hover:shadow-xl hover:bg-aurora-500/30',
               theme === 'dark' ? 'text-white' : 'text-slate-900',
@@ -61,7 +61,7 @@ export function HeaderBar() {
         {needsAction && (
           <button
             type="button"
-            onClick={() => audioEngine.start()}
+            onClick={() => enhancedAudioEngine.start()}
             className={clsx(
               'rounded-2xl border px-4 py-2 text-sm transition-all duration-300 hover:scale-110 hover:shadow-lg',
               theme === 'dark'

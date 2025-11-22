@@ -1,9 +1,7 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, createRadialGradient } from '../utils/colors'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES } from '../constants'
 
 interface Particle {
   angle: number
@@ -23,11 +21,8 @@ interface Particle {
   trail: Array<{ x: number; y: number; alpha: number }>
 }
 
-const PARTICLE_COUNT = 200 // Reduced for better performance with trails
-const TRAIL_LENGTH = 8
-
-function createParticles(): Particle[] {
-  return Array.from({ length: PARTICLE_COUNT }, () => {
+function createParticles(count: number): Particle[] {
+  return Array.from({ length: count }, () => {
     const initialRadius = 60 + Math.random() * 320
     return {
       angle: Math.random() * Math.PI * 2,
@@ -38,7 +33,7 @@ function createParticles(): Particle[] {
       z: Math.random(),
       zVelocity: 0,
       targetZ: Math.random(),
-      size: 2 + Math.random() * 5,
+      size: 3 + Math.random() * 8, // Bigger particles
       hue: 160 + Math.random() * 140,
       orbitSpeed: 0.002 + Math.random() * 0.01,
       elasticity: 0.12 + Math.random() * 0.18, // Stronger spring
@@ -51,10 +46,15 @@ function createParticles(): Particle[] {
 
 function OrbitalParticles({ sensitivity, theme }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const particlesRef = useRef<Particle[]>(createParticles())
+  const qualityParams = useQualityParams('orbitals')
+  const audioConfig = useAudioMappingConfig('orbitals')
   const timeRef = useRef(0)
+  
+  const PARTICLE_COUNT = qualityParams.particleCount || 100
+  const TRAIL_LENGTH = qualityParams.trailLength || 8
+  const particlesRef = useRef<Particle[]>(createParticles(PARTICLE_COUNT))
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -76,9 +76,10 @@ function OrbitalParticles({ sensitivity, theme }: VisualComponentProps) {
       ctx.fillStyle = theme === 'dark' ? 'rgba(0, 0, 5, 0.15)' : 'rgba(255, 255, 255, 0.15)'
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energies
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
       // Sort particles by depth for proper rendering
       const sortedParticles = [...particlesRef.current].sort((a, b) => a.z - b.z)
@@ -206,47 +207,74 @@ function OrbitalParticles({ sensitivity, theme }: VisualComponentProps) {
         }
       })
 
-      // ENHANCED central attractor with depth pulsing
-      const attractorRadius = 50 + bassEnergy * 100 + Math.sin(timeRef.current * 3) * 30
-      const attractorGradient = createRadialGradient(ctx, centerX, centerY, 0, attractorRadius * 1.5, [
-        { offset: 0, color: hsl(timeRef.current * 80 + 200, 100, 95, 0.9) },
-        { offset: 0.2, color: hsl(timeRef.current * 80 + 230, 100, 90, 0.8) },
-        { offset: 0.4, color: hsl(timeRef.current * 80 + 260, 95, 80, 0.6) },
-        { offset: 0.7, color: hsl(timeRef.current * 80 + 290, 90, 70, 0.3) },
-        { offset: 1, color: hsl(timeRef.current * 80 + 320, 85, 60, 0) },
+      // WILD Central attractor/energy source - MUCH more dramatic
+      const attractorRadius = 40 + bassEnergy * 80 + midEnergy * 50 + highEnergy * 30
+      
+      const attractorGradient = createRadialGradient(ctx, centerX, centerY, 0, attractorRadius * 2, [
+        { offset: 0, color: hsl(timeRef.current * 100 + 200, 100, 98, 1) },
+        { offset: 0.2, color: hsl(timeRef.current * 100 + 210, 100, 95, 0.95 + bassEnergy * 0.05) },
+        { offset: 0.4, color: hsl(timeRef.current * 100 + 220, 100, 85, 0.85 + midEnergy * 0.15) },
+        { offset: 0.7, color: hsl(timeRef.current * 100 + 240, 95, 70, 0.6 + highEnergy * 0.4) },
+        { offset: 0.9, color: hsl(timeRef.current * 100 + 260, 90, 55, 0.3) },
+        { offset: 1, color: 'rgba(0, 0, 0, 0)' },
       ])
-
+      
       ctx.fillStyle = attractorGradient
       ctx.beginPath()
-      ctx.arc(centerX, centerY, attractorRadius * 1.5, 0, Math.PI * 2)
+      ctx.arc(centerX, centerY, attractorRadius * 2, 0, Math.PI * 2)
       ctx.fill()
 
-      // Inner core
-      ctx.fillStyle = hsl(timeRef.current * 80 + 200, 100, 98, 0.8 + bassEnergy * 0.2)
-      ctx.shadowBlur = 30 + bassEnergy * 40
-      ctx.shadowColor = hsl(timeRef.current * 80 + 200, 100, 90, 0.9)
+      // WILD Inner core with pulsing rings
+      const coreRadius = 25 + bassEnergy * 50 + Math.sin(timeRef.current * 3) * 10
+      
+      // Outer glow
+      ctx.shadowBlur = 50 + bassEnergy * 80
+      ctx.shadowColor = hsl(timeRef.current * 100 + 200, 100, 90, 1)
+      
+      ctx.fillStyle = hsl(timeRef.current * 100 + 200, 100, 98, 0.9 + bassEnergy * 0.1)
       ctx.beginPath()
-      ctx.arc(centerX, centerY, 20 + bassEnergy * 30, 0, Math.PI * 2)
+      ctx.arc(centerX, centerY, coreRadius, 0, Math.PI * 2)
       ctx.fill()
+      
+      // Mid ring
+      ctx.fillStyle = hsl(timeRef.current * 100 + 220, 100, 95, 0.8)
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, coreRadius * 0.7, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // Inner bright spot
+      ctx.fillStyle = hsl(timeRef.current * 100 + 240, 100, 100, 1)
+      ctx.beginPath()
+      ctx.arc(centerX, centerY, coreRadius * 0.4, 0, Math.PI * 2)
+      ctx.fill()
+      
       ctx.shadowBlur = 0
 
-      // Orbital rings with depth
-      for (let ring = 0; ring < 4; ring++) {
-        const ringDepth = (ring + 1) / 4
-        const ringRadius = 80 + ring * 100 + bassEnergy * 50 * ringDepth
-        const ringAlpha = (0.3 - ring * 0.06) * (1 + midEnergy * 0.5)
+      // WILD Orbital rings with dramatic audio response
+      for (let ring = 0; ring < 5; ring++) {
+        const ringDepth = (ring + 1) / 5
+        const ringRadius = 100 + ring * 110 + bassEnergy * 70 * ringDepth + midEnergy * 40
+        const ringAlpha = (0.4 - ring * 0.06) * (1 + midEnergy * 0.7)
         
-        ctx.strokeStyle = hsl(timeRef.current * 60 + ring * 45 + 220, 90, 70, ringAlpha)
-        ctx.lineWidth = (1 + ring * 0.4) * (1 + ringDepth * 0.5)
-        ctx.setLineDash([8, 20])
-        ctx.lineDashOffset = -timeRef.current * 40 * (1 + ring * 0.6)
+        ctx.strokeStyle = hsl(timeRef.current * 80 + ring * 50 + 220, 95, 70, ringAlpha)
+        ctx.lineWidth = (1.5 + ring * 0.5) * (1 + ringDepth * 0.7 + bassEnergy * 0.5)
+        ctx.setLineDash([10, 18])
+        ctx.lineDashOffset = -timeRef.current * 50 * (1 + ring * 0.8 + midEnergy * 2)
         ctx.beginPath()
         ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2)
         ctx.stroke()
         ctx.setLineDash([])
+        
+        // Add glow to rings on high energy
+        if (bassEnergy > 0.5 || midEnergy > 0.6) {
+          ctx.shadowBlur = 15 + ringDepth * 20
+          ctx.shadowColor = hsl(timeRef.current * 80 + ring * 50 + 220, 100, 80, ringAlpha * 0.8)
+          ctx.stroke()
+          ctx.shadowBlur = 0
+        }
       }
     },
-    [sensitivity, theme],
+    [sensitivity, theme, PARTICLE_COUNT, TRAIL_LENGTH],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/20" />

@@ -1,13 +1,11 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
-import type { AudioFrame } from '../../state/types'
-
-const SEGMENTS = 8
+import type { EnhancedAudioFrame } from '../../audio/types'
 
 interface ShapeDefinition {
   name: string
-  render: (ctx: CanvasRenderingContext2D, radius: number, frame: AudioFrame, sensitivity: number, seed: number) => void
+  render: (ctx: CanvasRenderingContext2D, radius: number, frame: EnhancedAudioFrame, sensitivity: number, seed: number, sampleDensity?: number) => void
 }
 
 const SHAPES: ShapeDefinition[] = [
@@ -28,8 +26,8 @@ const SHAPES: ShapeDefinition[] = [
         ctx.lineTo(x, y)
       }
       ctx.closePath()
-      ctx.fillStyle = `hsla(${180 + frame.highEnergy * 220}, 75%, 62%, 0.4)`
-      ctx.strokeStyle = `hsla(${260 + frame.midEnergy * 150}, 100%, 80%, 0.65)`
+      ctx.fillStyle = `hsla(${180 + frame.highEnergy * 220}, 85%, 45%, 0.4)`
+      ctx.strokeStyle = `hsla(${260 + frame.midEnergy * 150}, 95%, 58%, 0.65)`
       ctx.lineWidth = 1.5
       ctx.fill()
       ctx.stroke()
@@ -61,12 +59,12 @@ const SHAPES: ShapeDefinition[] = [
         }
         ctx.closePath()
         
-        ctx.strokeStyle = `hsla(${40 + layer * 35 + frame.bassEnergy * 120}, 88%, 70%, ${easedMag * 0.8})`
+        ctx.strokeStyle = `hsla(${40 + layer * 35 + frame.bassEnergy * 120}, 88%, 52%, ${easedMag * 0.8})`
         ctx.lineWidth = 1.2 + easedMag * 2.5
         ctx.stroke()
         
         if (easedMag > 0.55) {
-          ctx.fillStyle = `hsla(${40 + layer * 35 + frame.bassEnergy * 120}, 82%, 62%, ${easedMag * 0.35})`
+          ctx.fillStyle = `hsla(${40 + layer * 35 + frame.bassEnergy * 120}, 82%, 42%, ${easedMag * 0.35})`
           ctx.fill()
         }
         
@@ -103,7 +101,7 @@ const SHAPES: ShapeDefinition[] = [
           }
           ctx.closePath()
           
-          ctx.strokeStyle = `hsla(${180 + ring * 30 + frame.midEnergy * 100}, 90%, 68%, ${easedMag * 0.7})`
+          ctx.strokeStyle = `hsla(${180 + ring * 30 + frame.midEnergy * 100}, 90%, 48%, ${easedMag * 0.7})`
           ctx.lineWidth = 0.9
           ctx.stroke()
         }
@@ -140,7 +138,7 @@ const SHAPES: ShapeDefinition[] = [
         
         ctx.fillStyle = `hsla(${280 + t * 15 + frame.bassEnergy * 130}, 84%, 64%, ${easedSample * 0.42})`
         ctx.fill()
-        ctx.strokeStyle = `hsla(${280 + t * 15 + frame.bassEnergy * 130 + 50}, 96%, 76%, ${easedSample * 0.78})`
+        ctx.strokeStyle = `hsla(${280 + t * 15 + frame.bassEnergy * 130 + 50}, 96%, 54%, ${easedSample * 0.78})`
         ctx.lineWidth = 1.3 + easedSample * 2.2
         ctx.stroke()
         
@@ -200,8 +198,8 @@ const SHAPES: ShapeDefinition[] = [
         ctx.rotate(angle)
         
         const gradient = ctx.createLinearGradient(0, 0, 0, length)
-        gradient.addColorStop(0, `hsla(${45 + i * 12 + frame.highEnergy * 180}, 92%, 70%, ${easedSample * 0.6})`)
-        gradient.addColorStop(1, `hsla(${45 + i * 12 + frame.highEnergy * 180 + 80}, 100%, 82%, ${easedSample * 0.9})`)
+        gradient.addColorStop(0, `hsla(${45 + i * 12 + frame.highEnergy * 180}, 92%, 50%, ${easedSample * 0.6})`)
+        gradient.addColorStop(1, `hsla(${45 + i * 12 + frame.highEnergy * 180 + 80}, 100%, 58%, ${easedSample * 0.9})`)
         
         ctx.strokeStyle = gradient
         ctx.lineWidth = 1.8 + easedSample * 4.5
@@ -212,7 +210,7 @@ const SHAPES: ShapeDefinition[] = [
         ctx.stroke()
         
         if (easedSample > 0.58) {
-          ctx.fillStyle = `hsla(${45 + i * 12 + frame.highEnergy * 180 + 120}, 100%, 88%, ${easedSample * 0.95})`
+          ctx.fillStyle = `hsla(${45 + i * 12 + frame.highEnergy * 180 + 120}, 100%, 60%, ${easedSample * 0.95})`
           ctx.beginPath()
           ctx.arc(0, length, 2.5 + easedSample * 4, 0, Math.PI * 2)
           ctx.fill()
@@ -250,7 +248,7 @@ const SHAPES: ShapeDefinition[] = [
         ctx.fillStyle = `hsla(${160 + i * 18 + frame.midEnergy * 140}, 86%, 64%, ${easedSample * 0.58})`
         ctx.fill()
         
-        ctx.strokeStyle = `hsla(${160 + i * 18 + frame.midEnergy * 140 + 65}, 100%, 80%, ${easedSample * 0.75})`
+        ctx.strokeStyle = `hsla(${160 + i * 18 + frame.midEnergy * 140 + 65}, 100%, 56%, ${easedSample * 0.75})`
         ctx.lineWidth = 0.9 + easedSample * 1.8
         ctx.stroke()
         
@@ -286,7 +284,7 @@ const SHAPES: ShapeDefinition[] = [
         
         ctx.fillStyle = `hsla(${100 + d * 16 + frame.highEnergy * 160}, 89%, 66%, ${easedSample * 0.48})`
         ctx.fill()
-        ctx.strokeStyle = `hsla(${100 + d * 16 + frame.highEnergy * 160 + 70}, 96%, 78%, ${easedSample * 0.78})`
+        ctx.strokeStyle = `hsla(${100 + d * 16 + frame.highEnergy * 160 + 70}, 96%, 55%, ${easedSample * 0.78})`
         ctx.lineWidth = 1.1 + easedSample * 2.3
         ctx.stroke()
       }
@@ -319,7 +317,7 @@ const SHAPES: ShapeDefinition[] = [
         }
         ctx.closePath()
         
-        ctx.strokeStyle = `hsla(${220 + p * 28 + frame.bassEnergy * 110}, 88%, 68%, ${easedMag * 0.8})`
+        ctx.strokeStyle = `hsla(${220 + p * 28 + frame.bassEnergy * 110}, 88%, 48%, ${easedMag * 0.8})`
         ctx.lineWidth = 1.3 + easedMag * 2.6
         ctx.stroke()
         
@@ -359,7 +357,7 @@ const SHAPES: ShapeDefinition[] = [
         }
         ctx.closePath()
         
-        ctx.strokeStyle = `hsla(${300 + ring * 25 + frame.midEnergy * 120}, 90%, 70%, ${easedMag * 0.75})`
+        ctx.strokeStyle = `hsla(${300 + ring * 25 + frame.midEnergy * 120}, 90%, 50%, ${easedMag * 0.75})`
         ctx.lineWidth = 1.2 + easedMag * 2.4
         ctx.stroke()
         
@@ -401,7 +399,7 @@ const SHAPES: ShapeDefinition[] = [
         ctx.translate(cx, cy)
         ctx.rotate(angle + easedSample * Math.PI * 0.5)
         
-        ctx.strokeStyle = `hsla(${20 + c * 24 + frame.bassEnergy * 150}, 88%, 68%, ${easedSample * 0.8})`
+        ctx.strokeStyle = `hsla(${20 + c * 24 + frame.bassEnergy * 150}, 88%, 48%, ${easedSample * 0.8})`
         ctx.lineWidth = 2 + easedSample * 4
         ctx.lineCap = 'round'
         
@@ -455,7 +453,7 @@ const SHAPES: ShapeDefinition[] = [
         
         ctx.fillStyle = `hsla(${140 + t * 10 + frame.midEnergy * 130}, 85%, 65%, ${easedSample * 0.5})`
         ctx.fill()
-        ctx.strokeStyle = `hsla(${140 + t * 10 + frame.midEnergy * 130 + 60}, 95%, 75%, ${easedSample * 0.75})`
+        ctx.strokeStyle = `hsla(${140 + t * 10 + frame.midEnergy * 130 + 60}, 95%, 52%, ${easedSample * 0.75})`
         ctx.lineWidth = 1.2
         ctx.stroke()
       }
@@ -487,7 +485,7 @@ const SHAPES: ShapeDefinition[] = [
         }
         ctx.closePath()
         
-        ctx.strokeStyle = `hsla(${80 + ring * 30 + frame.highEnergy * 140}, 88%, 68%, ${easedMag * 0.8})`
+        ctx.strokeStyle = `hsla(${80 + ring * 30 + frame.highEnergy * 140}, 88%, 48%, ${easedMag * 0.8})`
         ctx.lineWidth = 1.4 + easedMag * 2.8
         ctx.stroke()
         
@@ -527,7 +525,7 @@ const SHAPES: ShapeDefinition[] = [
           
           ctx.fillStyle = `hsla(${260 + layer * 25 + frame.midEnergy * 120}, 86%, 64%, ${easedMag * 0.55})`
           ctx.fill()
-          ctx.strokeStyle = `hsla(${260 + layer * 25 + frame.midEnergy * 120 + 50}, 95%, 76%, ${easedMag * 0.7})`
+          ctx.strokeStyle = `hsla(${260 + layer * 25 + frame.midEnergy * 120 + 50}, 95%, 54%, ${easedMag * 0.7})`
           ctx.lineWidth = 0.8
           ctx.stroke()
           
@@ -551,8 +549,8 @@ const SHAPES: ShapeDefinition[] = [
         const endY = y + Math.sin(angle) * length
         
         const gradient = ctx.createLinearGradient(x, y, endX, endY)
-        gradient.addColorStop(0, `hsla(${seed * 100 + depth * 40}, 88%, 68%, ${mag * (0.8 - depth * 0.15)})`)
-        gradient.addColorStop(1, `hsla(${seed * 100 + depth * 40 + 60}, 92%, 72%, ${mag * (0.6 - depth * 0.1)})`)
+        gradient.addColorStop(0, `hsla(${seed * 100 + depth * 40}, 88%, 48%, ${mag * (0.8 - depth * 0.15)})`)
+        gradient.addColorStop(1, `hsla(${seed * 100 + depth * 40 + 60}, 92%, 50%, ${mag * (0.6 - depth * 0.1)})`)
         
         ctx.strokeStyle = gradient
         ctx.lineWidth = depth * 0.8 + mag * 2
@@ -624,7 +622,7 @@ const SHAPES: ShapeDefinition[] = [
         
         ctx.fillStyle = `hsla(${point.hue}, 84%, 62%, ${point.mag * 0.4})`
         ctx.fill()
-        ctx.strokeStyle = `hsla(${point.hue + 60}, 92%, 72%, ${point.mag * 0.75})`
+        ctx.strokeStyle = `hsla(${point.hue + 60}, 92%, 50%, ${point.mag * 0.75})`
         ctx.lineWidth = 1.2 + point.mag * 2.5
         ctx.stroke()
         
@@ -656,9 +654,9 @@ const SHAPES: ShapeDefinition[] = [
       }
       
       const gradient = ctx.createLinearGradient(-radius, -radius, radius, radius)
-      gradient.addColorStop(0, `hsla(${seed * 150 + frame.highEnergy * 180}, 90%, 70%, ${easedMag * 0.75})`)
-      gradient.addColorStop(0.5, `hsla(${seed * 150 + frame.highEnergy * 180 + 120}, 95%, 75%, ${easedMag * 0.85})`)
-      gradient.addColorStop(1, `hsla(${seed * 150 + frame.highEnergy * 180 + 240}, 90%, 70%, ${easedMag * 0.75})`)
+      gradient.addColorStop(0, `hsla(${seed * 150 + frame.highEnergy * 180}, 90%, 50%, ${easedMag * 0.75})`)
+      gradient.addColorStop(0.5, `hsla(${seed * 150 + frame.highEnergy * 180 + 120}, 95%, 52%, ${easedMag * 0.85})`)
+      gradient.addColorStop(1, `hsla(${seed * 150 + frame.highEnergy * 180 + 240}, 90%, 50%, ${easedMag * 0.75})`)
       
       ctx.strokeStyle = gradient
       ctx.lineWidth = 1.5 + easedMag * 3.5
@@ -694,7 +692,7 @@ const SHAPES: ShapeDefinition[] = [
           else ctx.lineTo(x, y)
         }
         
-        ctx.strokeStyle = `hsla(${c * 40 + frame.midEnergy * 150}, 88%, 68%, ${easedSample * 0.7})`
+        ctx.strokeStyle = `hsla(${c * 40 + frame.midEnergy * 150}, 88%, 48%, ${easedSample * 0.7})`
         ctx.lineWidth = 1.2 + easedSample * 2.8
         ctx.stroke()
       }
@@ -731,8 +729,8 @@ const SHAPES: ShapeDefinition[] = [
       }
       
       const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius)
-      gradient.addColorStop(0, `hsla(${frame.bassEnergy * 180 + 200}, 92%, 72%, ${easedMag * 0.8})`)
-      gradient.addColorStop(0.5, `hsla(${frame.bassEnergy * 180 + 280}, 88%, 68%, ${easedMag * 0.7})`)
+      gradient.addColorStop(0, `hsla(${frame.bassEnergy * 180 + 200}, 92%, 50%, ${easedMag * 0.8})`)
+      gradient.addColorStop(0.5, `hsla(${frame.bassEnergy * 180 + 280}, 88%, 48%, ${easedMag * 0.7})`)
       gradient.addColorStop(1, `hsla(${frame.bassEnergy * 180 + 360}, 85%, 65%, ${easedMag * 0.6})`)
       
       ctx.strokeStyle = gradient
@@ -770,9 +768,9 @@ const SHAPES: ShapeDefinition[] = [
         }
         
         const gradient = ctx.createLinearGradient(-radius, 0, radius, 0)
-        gradient.addColorStop(0, `hsla(${s * 60 + frame.highEnergy * 180}, 90%, 70%, ${easedSample * 0.8})`)
-        gradient.addColorStop(0.5, `hsla(${s * 60 + frame.highEnergy * 180 + 120}, 95%, 75%, ${easedSample * 0.9})`)
-        gradient.addColorStop(1, `hsla(${s * 60 + frame.highEnergy * 180}, 90%, 70%, ${easedSample * 0.8})`)
+        gradient.addColorStop(0, `hsla(${s * 60 + frame.highEnergy * 180}, 90%, 50%, ${easedSample * 0.8})`)
+        gradient.addColorStop(0.5, `hsla(${s * 60 + frame.highEnergy * 180 + 120}, 95%, 52%, ${easedSample * 0.9})`)
+        gradient.addColorStop(1, `hsla(${s * 60 + frame.highEnergy * 180}, 90%, 50%, ${easedSample * 0.8})`)
         
         ctx.strokeStyle = gradient
         ctx.lineWidth = 1.8 + easedSample * 3.5
@@ -795,19 +793,24 @@ function shuffleArray<T>(array: T[]): T[] {
 
 function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('morph-kaleid')
+  const audioConfig = useAudioMappingConfig('morph-kaleid')
   const shuffledOrderRef = useRef<number[]>([])
   const currentIndexRef = useRef(0)
   const shapeTimerRef = useRef(0)
   const nextShapeTimeRef = useRef(12 + Math.random() * 16)
   const transitionProgressRef = useRef(0)
   const isTransitioningRef = useRef(false)
+  
+  const SEGMENTS = qualityParams.segmentCount || 8
+  const sampleDensity = qualityParams.sampleDensity || 1.0
 
   // Initialize shuffled order
   if (shuffledOrderRef.current.length === 0) {
     shuffledOrderRef.current = shuffleArray(Array.from({ length: SHAPES.length }, (_, i) => i))
   }
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame, time) => {
       const { width, height } = dims
@@ -816,7 +819,7 @@ function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
 
       const radius = Math.min(width, height) * 0.6
       const angleStep = (Math.PI * 2) / SEGMENTS
-      const rotation = frame.bassEnergy * Math.PI * sensitivity * 0.3 + time * 0.0001
+      const rotation = frame.bassEnergyNorm * Math.PI * sensitivity * (audioConfig.bassWeight || 1.0) * 0.3 + time * 0.0001
 
       // Shape morphing with smooth transitions
       shapeTimerRef.current += 0.016
@@ -861,13 +864,13 @@ function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
         // Render current shape
         if (!isTransitioningRef.current || transitionProgressRef.current < 1) {
           ctx.globalAlpha = isTransitioningRef.current ? 1 - transitionEase : 1
-          currentShape.render(ctx, radius, frame, sensitivity, i)
+          currentShape.render(ctx, radius, frame, sensitivity, i, sampleDensity)
         }
 
         // Render next shape during transition
         if (isTransitioningRef.current) {
           ctx.globalAlpha = transitionEase
-          nextShape.render(ctx, radius, frame, sensitivity, i)
+          nextShape.render(ctx, radius, frame, sensitivity, i, sampleDensity)
         }
 
         ctx.globalAlpha = 1
@@ -876,33 +879,19 @@ function MorphingKaleidoscope({ sensitivity }: VisualComponentProps) {
         ctx.scale(1, -1)
         if (!isTransitioningRef.current || transitionProgressRef.current < 1) {
           ctx.globalAlpha = isTransitioningRef.current ? 1 - transitionEase : 1
-          currentShape.render(ctx, radius, frame, sensitivity, i + 0.5)
+          currentShape.render(ctx, radius, frame, sensitivity, i + 0.5, sampleDensity)
         }
         if (isTransitioningRef.current) {
           ctx.globalAlpha = transitionEase
-          nextShape.render(ctx, radius, frame, sensitivity, i + 0.5)
+          nextShape.render(ctx, radius, frame, sensitivity, i + 0.5, sampleDensity)
         }
 
         ctx.restore()
       }
 
       ctx.restore()
-
-      // Gentle center glow
-      if (frame.bassEnergy > 0.7) {
-        const glowSize = 50 + frame.bassEnergy * 80
-        const glowGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, glowSize)
-        glowGradient.addColorStop(0, `hsla(${time * 0.1}, 85%, 65%, ${frame.bassEnergy * 0.35})`)
-        glowGradient.addColorStop(0.6, `hsla(${time * 0.1 + 80}, 75%, 55%, ${frame.bassEnergy * 0.2})`)
-        glowGradient.addColorStop(1, 'rgba(0,0,0,0)')
-
-        ctx.fillStyle = glowGradient
-          ctx.beginPath()
-        ctx.arc(width / 2, height / 2, glowSize, 0, Math.PI * 2)
-        ctx.fill()
-      }
     },
-    [sensitivity],
+    [sensitivity, SEGMENTS, sampleDensity],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />

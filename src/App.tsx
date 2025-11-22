@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import clsx from 'clsx'
 import { Settings2 } from 'lucide-react'
-import { audioEngine } from './audio/AudioEngine'
+import { enhancedAudioEngine } from './audio/EnhancedAudioEngine'
 import { useAppStore } from './state/useAppStore'
 import { HeaderBar } from './components/HeaderBar'
 import { ControlsPanel } from './components/ControlsPanel'
@@ -12,6 +12,7 @@ import { InstallPrompt } from './components/InstallPrompt'
 import { PerformanceStats } from './components/PerformanceStats'
 import { MobileBottomSheet } from './components/MobileBottomSheet'
 import { LoadingScreen } from './components/LoadingScreen'
+// import { DebugPanel } from './components/DebugPanel'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useTouchGestures } from './hooks/useTouchGestures'
 import { useAutoCycle } from './hooks/useAutoCycle'
@@ -37,7 +38,7 @@ function App() {
     // Only initialize after loading is complete
     if (!loadingComplete) return
 
-    audioEngine.start()
+    enhancedAudioEngine.start()
     performanceMonitor.start()
     
     // Mobile optimizations
@@ -67,7 +68,7 @@ function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     
     return () => {
-      audioEngine.stop()
+      enhancedAudioEngine.stop()
       performanceMonitor.stop()
       window.removeEventListener('keydown', handleKeyPress)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -155,6 +156,7 @@ function App() {
         
         <InstallPrompt />
         <PerformanceStats show={showPerformance} />
+        {/* <DebugPanel /> */}
       </div>
     </>
   )

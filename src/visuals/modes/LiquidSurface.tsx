@@ -1,9 +1,7 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, createRadialGradient, createLinearGradient } from '../utils/colors'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES } from '../constants'
 
 interface AuroraLayer {
   offset: number
@@ -26,11 +24,16 @@ interface Droplet {
 
 function LiquidSurface({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('liquid')
+  const audioConfig = useAudioMappingConfig('liquid')
   const layersRef = useRef<AuroraLayer[]>([])
   const dropletsRef = useRef<Droplet[]>([])
   const timeRef = useRef(0)
+  
+  const LAYER_COUNT = qualityParams.segmentCount || 6
+  const DROPLET_LIMIT = qualityParams.particleCount || 40
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -45,13 +48,15 @@ function LiquidSurface({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = bgGradient
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energies with config weights
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
-      // Initialize aurora layers
-      if (layersRef.current.length === 0) {
-        for (let i = 0; i < 5; i++) {
+      // Initialize aurora layers based on quality
+      if (layersRef.current.length === 0 || Math.abs(layersRef.current.length - LAYER_COUNT) > 1) {
+        layersRef.current = []
+        for (let i = 0; i < LAYER_COUNT; i++) {
           layersRef.current.push({
             offset: Math.random() * 1000,
             speed: 0.2 + Math.random() * 0.4,
@@ -107,8 +112,8 @@ function LiquidSurface({ sensitivity }: VisualComponentProps) {
       })
       ctx.globalCompositeOperation = 'source-over'
 
-      // Create droplets on high energy
-      if (highEnergy > 0.5 && Math.random() > 0.85) {
+      // Create droplets on high energy (limited by quality)
+      if (highEnergy > 0.5 && Math.random() > 0.85 && dropletsRef.current.length < DROPLET_LIMIT) {
         dropletsRef.current.push({
           x: Math.random() * width,
           y: -10,
@@ -200,7 +205,7 @@ function LiquidSurface({ sensitivity }: VisualComponentProps) {
       ctx.fill()
       ctx.globalCompositeOperation = 'source-over'
     },
-    [sensitivity],
+    [sensitivity, LAYER_COUNT, DROPLET_LIMIT],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/30" />

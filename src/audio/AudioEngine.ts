@@ -65,14 +65,17 @@ class AudioEngine {
       
       this.analyser = this.context.createAnalyser()
       this.analyser.fftSize = 2048
-      this.analyser.smoothingTimeConstant = 0.75 // Slightly reduced for more responsiveness
-      this.analyser.minDecibels = -90
-      this.analyser.maxDecibels = -10
+      this.analyser.smoothingTimeConstant = 0.8 // Original setting - smooth but responsive
+      this.analyser.minDecibels = -95 // Lower threshold - catches quieter sounds
+      this.analyser.maxDecibels = -10 // Original - full dynamic range
       this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
       this.waveformArray = new Uint8Array(this.analyser.fftSize)
       
       source.connect(this.gainNode)
       this.gainNode.connect(this.analyser)
+      
+      // Boost input gain for better sensitivity
+      this.gainNode.gain.value = 1.5
 
       if (this.context.state === 'suspended') {
         this.setStatus('suspended', 'Tap to activate the audio engine.')
@@ -190,7 +193,7 @@ class AudioEngine {
     const rawHigh = computeBandEnergy(HIGH_RANGE)
 
     // Apply smoothing for less jitter (exponential moving average)
-    const smoothingFactor = 0.25
+    const smoothingFactor = 0.25 // Original setting - good balance
     this.smoothedBass += (rawBass - this.smoothedBass) * smoothingFactor
     this.smoothedMid += (rawMid - this.smoothedMid) * smoothingFactor
     this.smoothedHigh += (rawHigh - this.smoothedHigh) * smoothingFactor
@@ -246,8 +249,8 @@ class AudioEngine {
       if (!this.analyser) {
         this.analyser = this.context.createAnalyser()
         this.analyser.fftSize = 2048
-        this.analyser.smoothingTimeConstant = 0.75
-        this.analyser.minDecibels = -90
+        this.analyser.smoothingTimeConstant = 0.8
+        this.analyser.minDecibels = -95 // Lower threshold - catches quieter sounds
         this.analyser.maxDecibels = -10
         this.dataArray = new Uint8Array(this.analyser.frequencyBinCount)
         this.waveformArray = new Uint8Array(this.analyser.fftSize)
@@ -255,7 +258,7 @@ class AudioEngine {
 
       if (!this.gainNode) {
         this.gainNode = this.context.createGain()
-        this.gainNode.gain.value = 1.0
+        this.gainNode.gain.value = 1.5 // Boost input for better sensitivity
       }
 
       // Connect audio element to analyser with gain control

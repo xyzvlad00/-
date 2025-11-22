@@ -20,6 +20,8 @@ export type VisualMode =
   | 'dna'
   | 'matrix'
   | 'explosion'
+  | 'gallery'
+  | 'thresholds'
 
 export type ThemeMode = 'dark' | 'light'
 

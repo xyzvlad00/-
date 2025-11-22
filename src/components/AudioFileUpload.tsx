@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { Upload, Music } from 'lucide-react'
 import clsx from 'clsx'
-import { audioEngine } from '../audio/AudioEngine'
+import { enhancedAudioEngine } from '../audio/EnhancedAudioEngine'
 
 interface Props {
   onFileLoaded?: (filename: string) => void
@@ -21,7 +21,7 @@ export function AudioFileUpload({ onFileLoaded }: Props) {
     }
 
     try {
-      await audioEngine.loadAudioFile(file)
+      await enhancedAudioEngine.loadAudioFile(file)
       onFileLoaded?.(file.name)
     } catch (error) {
       console.error('Failed to load audio file:', error)

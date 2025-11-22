@@ -1,9 +1,7 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, createRadialGradient } from '../utils/colors'
-import { easeAudio } from '../utils/audio'
-import { EASING_CURVES } from '../constants'
 
 // ULTRA-IMPRESSIVE: Massive 3D Galaxy Simulation with depth and spectacular effects
 interface Star {
@@ -20,16 +18,18 @@ interface Star {
   trail: Array<{ x: number; y: number; alpha: number }>
 }
 
-const STAR_COUNT = 800 // Optimized for performance
-const TRAIL_LENGTH = 5 // Reduced for better performance (50% fewer draw calls)
-
 function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('galaxy')
+  const audioConfig = useAudioMappingConfig('galaxy')
   const starsRef = useRef<Star[]>([])
   const timeRef = useRef(0)
   const nebulaRef = useRef<Array<{ x: number; y: number; radius: number; hue: number; alpha: number }>>([])
+  
+  const STAR_COUNT = qualityParams.particleCount || 800
+  const TRAIL_LENGTH = qualityParams.trailLength || 5
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -48,9 +48,10 @@ function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = bgGradient
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energies with audio config weights
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
       // Initialize stars with DRAMATIC spiral formation
       if (starsRef.current.length === 0) {
@@ -285,20 +286,14 @@ function ParticleGalaxy({ sensitivity }: VisualComponentProps) {
           ctx.lineTo(endX, endY)
           ctx.stroke()
         }
-      }
 
-      // Info overlay
-      if (frame.beatInfo?.bpm && frame.beatInfo.bpm > 0) {
-        ctx.fillStyle = hsl(200, 70, 70, 0.8)
-        ctx.font = 'bold 12px system-ui, sans-serif'
-        ctx.textAlign = 'left'
-        ctx.fillText(`${STAR_COUNT} Stars | ${frame.beatInfo.bpm} BPM`, 15, height - 15)
       }
     },
-    [sensitivity],
+    [sensitivity, STAR_COUNT, TRAIL_LENGTH],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black/10" />
 }
 
 export default ParticleGalaxy
+

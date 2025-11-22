@@ -1,10 +1,9 @@
 import { useRef } from 'react'
-import { useCanvasLoop } from '../useCanvasLoop'
+import { useEnhancedCanvasLoop, useQualityParams, useAudioMappingConfig } from '../useEnhancedCanvasLoop'
 import type { VisualComponentProps } from '../types'
 import { hsl, createRadialGradient, createLinearGradient } from '../utils/colors'
-import { easeAudio, getFrequencyValue } from '../utils/audio'
+import { getFrequencyValue } from '../utils/audio'
 import { applyGlow, clearGlow } from '../utils/shapes'
-import { EASING_CURVES } from '../constants'
 
 const BANDS = 16
 const SEGMENTS_PER_RING = 80 // Reduced for better performance
@@ -20,10 +19,14 @@ interface Particle {
 
 function FrequencyRings({ sensitivity }: VisualComponentProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const qualityParams = useQualityParams('rings')
+  const audioConfig = useAudioMappingConfig('rings')
   const particlesRef = useRef<Particle[]>([])
   const waveRef = useRef<Array<{ radius: number; alpha: number; width: number }>>([])
+  
+  const RING_SEGMENTS = qualityParams.segmentCount || 80
 
-  useCanvasLoop(
+  useEnhancedCanvasLoop(
     canvasRef,
     (ctx, dims, frame) => {
       const { width, height } = dims
@@ -41,9 +44,10 @@ function FrequencyRings({ sensitivity }: VisualComponentProps) {
       ctx.fillStyle = bgGradient
       ctx.fillRect(0, 0, width, height)
 
-      const bassEnergy = easeAudio(frame.bassEnergy, EASING_CURVES.BASS) * sensitivity
-      const midEnergy = easeAudio(frame.midEnergy, EASING_CURVES.MID) * sensitivity
-      const highEnergy = easeAudio(frame.highEnergy, EASING_CURVES.HIGH) * sensitivity
+      // Use normalized energies with config weights
+      const bassEnergy = frame.bassEnergyNorm * sensitivity * (audioConfig.bassWeight || 1.0)
+      const midEnergy = frame.midEnergyNorm * sensitivity * (audioConfig.midWeight || 1.0)
+      const highEnergy = frame.highEnergyNorm * sensitivity * (audioConfig.highWeight || 1.0)
 
       // Central core
       const coreRadius = 25 + frame.overallVolume * 50 * sensitivity + bassEnergy * 40
@@ -85,11 +89,11 @@ function FrequencyRings({ sensitivity }: VisualComponentProps) {
         // Zone-specific easing
         let easedMag: number
         if (bandRatio < 0.25) {
-          easedMag = easeAudio(freqValue, 0.9) * (1 + bassEnergy * 0.6)
+          easedMag = Math.pow(freqValue, 0.9) * (1 + bassEnergy * 0.6)
         } else if (bandRatio < 0.7) {
-          easedMag = easeAudio(freqValue, 1.1) * (1 + midEnergy * 0.45)
+          easedMag = Math.pow(freqValue, 1.1) * (1 + midEnergy * 0.45)
         } else {
-          easedMag = easeAudio(freqValue, 1.3) * (1 + highEnergy * 0.5)
+          easedMag = Math.pow(freqValue, 1.3) * (1 + highEnergy * 0.5)
         }
 
         const ringRadius = baseRadius + band * ringSpacing
@@ -267,7 +271,7 @@ function FrequencyRings({ sensitivity }: VisualComponentProps) {
         }
       }
     },
-    [sensitivity],
+    [sensitivity, RING_SEGMENTS],
   )
 
   return <canvas ref={canvasRef} className="block h-full min-h-[420px] w-full rounded-3xl bg-black" />

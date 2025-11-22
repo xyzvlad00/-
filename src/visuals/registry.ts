@@ -21,6 +21,8 @@ const ChromaticWaves = lazy(() => import('./modes/ChromaticWaves'))
 const NeuralNetwork = lazy(() => import('./modes/NeuralNetwork'))
 const DNAHelix = lazy(() => import('./modes/DNAHelix'))
 const MatrixRain = lazy(() => import('./modes/MatrixRain'))
+const NonEuclideanGallery = lazy(() => import('./modes/NonEuclideanGallery'))
+const RecursiveThresholds = lazy(() => import('./modes/RecursiveThresholds'))
 
 export const visualRegistry: VisualDefinition[] = [
   { id: 'morph-kaleid', name: 'Morphing Kaleidoscope', description: 'Geometry that transforms and rotates', Component: MorphingKaleidoscope },
@@ -41,6 +43,8 @@ export const visualRegistry: VisualDefinition[] = [
   { id: 'city', name: 'Spectrum City', description: 'City skyline heights from frequency bands', Component: SpectrumCity },
   { id: 'dna', name: 'DNA Helix', description: 'Double helix structure with base pair connections', Component: DNAHelix },
   { id: 'matrix', name: 'Matrix Rain', description: 'Falling matrix code with beat detection', Component: MatrixRain },
+  { id: 'gallery', name: 'Non-Euclidean Gallery', description: 'Mind-bending art collage with impossible geometry', Component: NonEuclideanGallery },
+  { id: 'thresholds', name: 'Recursive Thresholds', description: 'Journey through dimensional doorways', Component: RecursiveThresholds },
 ]
 
 export const getVisualById = (id: VisualDefinition['id']) => visualRegistry.find((visual) => visual.id === id) ?? visualRegistry[0]
